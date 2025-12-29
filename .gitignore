@@ -1,0 +1,64 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+so_cl
+so_cl.exe
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.out
+coverage.html
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+# Go workspace file
+go.work
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# BadgerDB data directory
+data/
+badger.db
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# SSB secrets (NEVER commit these)
+.secret
+secret
+secret.d/
+.ssb/
+
+# Build artifacts
+dist/
+build/
+
+# OS specific files
+Thumbs.db
+.DS_Store
+
+# Debug logs
+*.log
+debug.log
+output.log

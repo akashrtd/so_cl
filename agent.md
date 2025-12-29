@@ -252,11 +252,11 @@ so_cl/
 ### Session State
 
 **Last Updated**: 2025-12-29
-**Current Phase**: [EDIT THIS - Phase 0/1/2/3]
-**Current Task**: [EDIT THIS - e.g., "Initialize project structure"]
-**Last Completed**: [EDIT THIS - e.g., "Created agent.md"]
-**Blockers**: [EDIT THIS - e.g., "None" or specific issue]
-**Next Priority**: [EDIT THIS - e.g., "Create go.mod with dependencies"]
+**Current Phase**: Phase 0 (MVP)
+**Current Task**: Implement identity generation with scuttlego
+**Last Completed**: Project structure initialization
+**Blockers**: None
+**Next Priority**: Generate SSB identity (Ed25519 keypair)
 
 ---
 
@@ -266,15 +266,25 @@ so_cl/
 |------|------|--------|-------|
 | 2025-12-29 | Created agent.md reference file | ✅ Complete | Full AI agent guide with TODO list |
 | 2025-12-29 | Revised production.md with scuttlego/BadgerDB | ✅ Complete | Fixed hallucinated libraries, realistic targets |
-| | | | |
+| 2025-12-29 | Created README.md and CONTRIBUTING.md | ✅ Complete | User guide and contribution guidelines |
+| 2025-12-29 | Initialized project structure | ✅ Complete | go.mod, Makefile, directories created |
+| 2025-12-29 | Created core package skeleton | ✅ Complete | identity.go, message.go, types.go |
+| 2025-12-29 | Created scuttlego wrapper (stub) | ✅ Complete | service.go with TODO markers |
+| 2025-12-29 | Created UI model (Bubble Tea) | ✅ Complete | model.go with basic TUI |
+| 2025-12-29 | Created indexes package (stub) | ✅ Complete | hashtags.go for BadgerDB indexing |
+| 2025-12-29 | Created config package | ✅ Complete | config.go with environment loading |
+| 2025-12-29 | Created main.go entry point | ✅ Complete | Graceful shutdown, logging |
+| 2025-12-29 | Built static binary | ✅ Complete | 6.6MB, runs correctly |
 
 ---
 
 ### Current Session Goals
 
-1. [ ] [GOAL 1]
-2. [ ] [GOAL 2]
-3. [ ] [GOAL 3]
+1. [x] Initialize project structure (go.mod, directories, Makefile)
+2. [ ] Generate SSB identity (Ed25519 keypair) via scuttlego
+3. [ ] Generate ASCII profile pictures (6x6 colored ANSI)
+4. [ ] Implement post creation (280 char limit, scuttlego PublishRaw)
+5. [ ] Implement basic feed view (list posts)
 
 ---
 
@@ -479,23 +489,23 @@ zap.L().Info("peer connected",
 
 ### 📋 **Phase 0: MVP (Week 1-2)**
 
-- [ ] **Initialize project structure**
-  - [ ] Create `go.mod` with dependencies
-  - [ ] Set up directory structure (ui/, core/, async/, etc.)
-  - [ ] Create `scuttlego/service.go` wrapper
-  - [ ] Create `indexes/` package skeleton
-  - [ ] Add `.gitignore`, `LICENSE`, `README.md`
+- [x] **Initialize project structure**
+  - [x] Create `go.mod` with dependencies
+  - [x] Set up directory structure (ui/, core/, async/, etc.)
+  - [x] Create `scuttlego/service.go` wrapper
+  - [x] Create `indexes/` package skeleton
+  - [x] Add `.gitignore`, `LICENSE`, `README.md`
 
 - [ ] **Identity generation**
   - [ ] Generate SSB keypair (Ed25519)
   - [ ] Store in BadgerDB (via scuttlego)
-  - [ ] Create `core/identity.go` wrapper
+  - [x] Create `core/identity.go` wrapper
   - [ ] Add ASCII PFP generator (6x6, ANSI colors)
   - [ ] Test key generation and signing
 
 - [ ] **Post creation**
-  - [ ] Build TUI composer (Bubble Tea input)
-  - [ ] Validate 280-char limit
+  - [x] Build TUI composer (Bubble Tea input)
+  - [x] Validate 280-char limit
   - [ ] Build SSB post content (`message.NewRawContent`)
   - [ ] Publish via `scuttlego.App.Commands.PublishRaw`
   - [ ] Index post for hashtags/mentions
@@ -504,17 +514,17 @@ zap.L().Info("peer connected",
 
 - [ ] **Feed view**
   - [ ] Query posts via `scuttlego.App.Queries.ReceiveLog`
-  - [ ] Format posts for TUI display
+  - [x] Format posts for TUI display
   - [ ] Show ASCII PFP (6x6 colors)
   - [ ] Show timestamp, author, text
   - [ ] Implement pagination (100 posts max in memory)
   - [ ] Test feed rendering
 
-- [ ] **Static binary build**
-  - [ ] Create `Makefile`
-  - [ ] Build with `CGO_ENABLED=0`
-  - [ ] Verify <50MB size
-  - [ ] Test on Linux/macOS/Windows
+- [x] **Static binary build**
+  - [x] Create `Makefile`
+  - [x] Build with `CGO_ENABLED=0`
+  - [x] Verify <50MB size (6.6MB achieved)
+  - [ ] Test on Linux/macOS/Windows (tested locally)
   - [ ] Add `goreleaser` config
 
 ### 📋 **Phase 1: P2P (Week 3-4)**
