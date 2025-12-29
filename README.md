@@ -1,6 +1,6 @@
 # so_cl
 
-> **A decentralized ASCII-art-based social platform for your terminal**
+> **A decentralized social platform for your terminal**
 
 <div align="center">
 
