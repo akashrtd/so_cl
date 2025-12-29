@@ -1,125 +1,108 @@
 package scuttlego
 
-// Package scuttlego provides a wrapper around the scuttlego library
-// for easier integration with the so_cl application.
-//
-// This package handles:
-// - Service lifecycle initialization
-// - Configuration management
-// - Adapters to convert between scuttlego and so_cl types
-
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/planetary-social/scuttlego/service"
+	"github.com/planetary-social/scuttlego/service/app/commands"
+	"github.com/planetary-social/scuttlego/service/app/common"
+	"github.com/planetary-social/scuttlego/service/app/queries"
+	scuttlegodi "github.com/planetary-social/scuttlego/service/di"
+	"github.com/planetary-social/scuttlego/service/domain/feeds/message"
+	"github.com/planetary-social/scuttlego/service/domain/identity"
+	"github.com/planetary-social/scuttlego/service/domain/network"
+	"github.com/planetary-social/scuttlego/service/domain/refs"
 	"go.uber.org/zap"
 )
 
-// Service wraps the scuttlego service for use in so_cl.
-// It provides a simplified interface for common operations like
-// publishing posts, following peers, and querying messages.
 type Service struct {
-	// config holds the service configuration
 	config Config
-	// logger is the structured logger for this service
 	logger *zap.Logger
+
+	svc     *service.Service
+	cleanup func()
 }
 
-// Config represents the configuration for the scuttlego service.
 type Config struct {
-	// DataDir is the directory where scuttlego stores data
-	DataDir string
-	// ListenPort is the port to listen on for SSB connections
-	ListenPort int
-	// NetworkKey is the SSB network key (default: SSB network)
-	NetworkKey string
-	// EnableLANDiscovery enables UDP broadcast for local peer discovery
+	DataDir            string
+	ListenPort         int
 	EnableLANDiscovery bool
 }
 
-// DefaultConfig returns a reasonable default configuration.
 func DefaultConfig() Config {
+	home, _ := os.UserHomeDir()
 	return Config{
-		DataDir:            "~/.so_cl/data",
+		DataDir:            filepath.Join(home, ".so_cl", "data"),
 		ListenPort:         8008,
-		NetworkKey:         "", // Use default SSB network key
 		EnableLANDiscovery: true,
 	}
 }
 
-// NewService creates a new scuttlego service with the given configuration.
-//
-// It initializes the scuttlego service with all required components:
-// - BadgerDB storage
-// - Network listener
-// - EBT replication
-// - LAN discovery (if enabled)
-//
-// Returns an error if service initialization fails.
 func NewService(cfg Config, logger *zap.Logger) (*Service, error) {
 	logger.Info("Initializing scuttlego service",
 		zap.String("data_dir", cfg.DataDir),
 		zap.Int("port", cfg.ListenPort),
 	)
 
-	// TODO: Implement actual scuttlego service initialization
-	// This requires:
-	// 1. Setting up BadgerDB
-	// 2. Configuring network settings
-	// 3. Creating service.Application
-	// 4. Setting up listener
-	// 5. Setting up EBT replication
-	// 6. Setting up LAN discovery (if enabled)
+	listenAddr := fmt.Sprintf(":%d", cfg.ListenPort)
+
+	scConfig := service.Config{
+		DataDirectory: cfg.DataDir,
+		ListenAddress: listenAddr,
+	}
+	scConfig.SetDefaults()
+
+	privateIdentity, err := identity.NewPrivate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate identity: %w", err)
+	}
+
+	svc, cleanup, err := scuttlegodi.BuildService(privateIdentity, scConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build scuttlego service: %w", err)
+	}
 
 	return &Service{
-		config: cfg,
-		logger: logger,
+		config:  cfg,
+		logger:  logger,
+		svc:     &svc,
+		cleanup: cleanup,
 	}, nil
 }
 
-// Run starts the scuttlego service and blocks until context is cancelled.
-//
-// This method:
-// 1. Starts the network listener
-// 2. Starts EBT replication
-// 3. Starts LAN discovery (if enabled)
-// 4. Blocks until context is cancelled
-// 5. Gracefully shuts down all components
-//
-// Returns an error if any component fails to start.
 func (s *Service) Run(ctx context.Context) error {
 	s.logger.Info("Starting scuttlego service")
 
-	// TODO: Implement actual service run logic
-	// This requires:
-	// 1. Starting the listener
-	// 2. Starting the EBT replication loop
-	// 3. Starting the LAN discovery (if enabled)
-	// 4. Handling shutdown on context cancellation
+	errCh := make(chan error, 1)
 
-	<-ctx.Done()
-	s.logger.Info("Stopping scuttlego service")
-	return nil
+	go func() {
+		errCh <- s.svc.Run(ctx)
+	}()
+
+	select {
+	case <-ctx.Done():
+		s.logger.Info("Context cancelled, stopping service")
+		return ctx.Err()
+	case err := <-errCh:
+		return fmt.Errorf("scuttlego service error: %w", err)
+	}
 }
 
-// Close gracefully shuts down the scuttlego service.
 func (s *Service) Close() error {
 	s.logger.Info("Closing scuttlego service")
 
-	// TODO: Implement graceful shutdown
-	// This requires:
-	// 1. Closing the listener
-	// 2. Waiting for in-flight operations
-	// 3. Closing BadgerDB
-	// 4. Flushing any buffered data
+	if s.cleanup != nil {
+		s.cleanup()
+	}
 
 	return nil
 }
 
-// Publish publishes a new post to the SSB feed.
-// The text must be 1-280 characters and contain only ASCII characters.
-//
-// Returns the message reference if successful, or an error if publishing fails.
 func (s *Service) Publish(text string) (string, error) {
 	if len(text) == 0 {
 		return "", fmt.Errorf("empty post text")
@@ -133,65 +116,153 @@ func (s *Service) Publish(text string) (string, error) {
 		zap.Int("length", len(text)),
 	)
 
-	// TODO: Implement publish using scuttlego PublishRaw command
-	// This requires:
-	// 1. Building SSB post content
-	// 2. Calling PublishRaw command
-	// 3. Returning message reference
+	content := map[string]interface{}{
+		"type": "post",
+		"text": text,
+	}
 
-	return "", nil
+	contentJSON, err := json.Marshal(content)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal content: %w", err)
+	}
+
+	rawContent, err := message.NewRawContent(contentJSON)
+	if err != nil {
+		return "", fmt.Errorf("failed to create raw content: %w", err)
+	}
+
+	cmd, err := commands.NewPublishRaw(rawContent.Bytes())
+	if err != nil {
+		return "", fmt.Errorf("failed to create publish command: %w", err)
+	}
+
+	msgRef, err := s.svc.App.Commands.PublishRaw.Handle(cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed to publish: %w", err)
+	}
+
+	return msgRef.String(), nil
 }
 
-// Follow starts following the given peer feed.
-// The feedRef is a SSB feed reference (e.g., "@alice...").
-//
-// Returns an error if following fails.
 func (s *Service) Follow(feedRef string) error {
 	s.logger.Info("Following peer",
 		zap.String("feed_ref", feedRef),
 	)
 
-	// TODO: Implement follow using scuttlego Follow command
-	// This requires:
-	// 1. Parsing feed reference
-	// 2. Calling Follow command
-	// 3. Returning error if it fails
+	peerIdentity, err := refs.NewIdentity(feedRef)
+	if err != nil {
+		return fmt.Errorf("invalid feed reference: %w", err)
+	}
+
+	cmd := commands.Follow{Target: peerIdentity}
+	err = s.svc.App.Commands.Follow.Handle(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to follow: %w", err)
+	}
 
 	return nil
 }
 
-// Connect connects to a peer at the given address.
-// The address is in multiserver format (e.g., "net:127.0.0.1:8008~shs:@alice...").
-//
-// Returns an error if connection fails.
 func (s *Service) Connect(address string) error {
 	s.logger.Info("Connecting to peer",
 		zap.String("address", address),
 	)
 
-	// TODO: Implement connect using scuttlego Connect command
-	// This requires:
-	// 1. Parsing address
-	// 2. Calling Connect command
-	// 3. Returning error if it fails
+	sep := "~shs:"
+	idx := strings.Index(address, sep)
+	if idx < 0 {
+		return fmt.Errorf("invalid address format, expected ~shs: separator")
+	}
+
+	identityString := address[idx+len(sep):]
+	peerIdentity, err := refs.NewIdentity(identityString)
+	if err != nil {
+		return fmt.Errorf("could not parse identity from address: %w", err)
+	}
+
+	addr := network.NewAddress(address)
+
+	cmd := commands.Connect{
+		Remote:  refs.MustNewIdentityFromPublic(peerIdentity.Identity()).Identity(),
+		Address: addr,
+	}
+
+	ctx := context.Background()
+	connectErr := s.svc.App.Commands.Connect.Handle(ctx, cmd)
+	if connectErr != nil {
+		return fmt.Errorf("failed to connect: %w", connectErr)
+	}
 
 	return nil
 }
 
-// GetRecentMessages retrieves recent messages from the feed.
-// The limit specifies the maximum number of messages to retrieve.
-//
-// Returns a slice of message references, or an error if retrieval fails.
-func (s *Service) GetRecentMessages(limit int) ([]string, error) {
+func (s *Service) GetRecentMessages(limit int) ([]Message, error) {
 	s.logger.Info("Retrieving recent messages",
 		zap.Int("limit", limit),
 	)
 
-	// TODO: Implement query using scuttlego ReceiveLog query
-	// This requires:
-	// 1. Calling ReceiveLog query
-	// 2. Iterating over messages
-	// 3. Returning message references
+	startSeq, err := common.NewReceiveLogSequence(0)
+	if err != nil {
+		return nil, err
+	}
 
-	return []string{}, nil
+	query, err := queries.NewReceiveLog(startSeq, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	messages, err := s.svc.App.Queries.ReceiveLog.Handle(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get messages: %w", err)
+	}
+
+	result := make([]Message, 0, len(messages))
+	for _, logMsg := range messages {
+		author := logMsg.Message.Author().String()
+
+		if logMsg.Message.Content().IsZero() {
+			result = append(result, Message{
+				Author: author,
+				Text:   "(raw content)",
+				Time:   logMsg.Sequence.Int(),
+			})
+			continue
+		}
+
+		known, hasKnown := logMsg.Message.Content().KnownContent()
+		if !hasKnown {
+			result = append(result, Message{
+				Author: author,
+				Text:   "(unknown content)",
+				Time:   logMsg.Sequence.Int(),
+			})
+			continue
+		}
+
+		postContent := make(map[string]interface{})
+		if err := json.Unmarshal(logMsg.Message.Content().Raw().Bytes(), &postContent); err == nil {
+			if text, ok := postContent["text"].(string); ok {
+				result = append(result, Message{
+					Author: author,
+					Text:   text,
+					Time:   logMsg.Sequence.Int(),
+				})
+				continue
+			}
+		}
+
+		result = append(result, Message{
+			Author: author,
+			Text:   fmt.Sprintf("%s", known.Type()),
+			Time:   logMsg.Sequence.Int(),
+		})
+	}
+
+	return result, nil
+}
+
+type Message struct {
+	Author string
+	Text   string
+	Time   int
 }
