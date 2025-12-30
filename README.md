@@ -1,16 +1,8 @@
 # so_cl
-                              ___      
-                             /\_ \     
-  ____    ___             ___\//\ \    
- /',__\  / __`\          /'___\\ \ \   
-/\__, `\/\ \L\ \        /\ \__/ \_\ \_ 
-\/\____/\ \____/        \ \____\/\____\
- \/___/  \/___/   _______\/____/\/____/
-                 /\______\             
-                 \/______/             
-> **A decentralized social platform for your terminal**
 
-![alt text](image.png)
+![alt text](s0_cl.png)
+
+> **A decentralized social platform for your terminal**
 
 <div align="center">
 
