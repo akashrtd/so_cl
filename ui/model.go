@@ -22,12 +22,22 @@ type ScuttlegoService interface {
 	React(postRef, expression string) (string, error)
 	GetRecentMessages(limit int) ([]scuttlego.Message, error)
 	Follow(feedRef string) error
+	Unfollow(feedRef string) error
+	GetIdentity() string
 	Connect(address string) error
 	RedeemInvite(inviteCode string) error
 	GetPeers() ([]scuttlego.Peer, error)
 	GetEBTStatus() (bool, int, int)
 	GetTopHashtags(n int) ([]core.TrendingHashtag, error)
 	GetMentions(feedRef string) ([]string, error)
+	GetFollowing(feedRef string) ([]string, error)
+	GetFollowers(feedRef string) ([]string, error)
+	IsFollowing(follower, following string) (bool, error)
+	GetFollowingCount(feedRef string) (int, error)
+	GetFollowersCount(feedRef string) (int, error)
+	SearchPosts(query string) ([]string, error)
+	FilterByHashtag(hashtag string) ([]string, error)
+	FilterByAuthor(author string) ([]string, error)
 }
 
 type Post struct {
@@ -91,6 +101,41 @@ type FollowedMsg struct {
 	FeedRef string
 }
 
+type UnfollowedMsg struct {
+	FeedRef string
+}
+
+type FollowGraphLoadedMsg struct {
+	Following []string
+	Followers []string
+}
+
+type SearchResultsLoadedMsg struct {
+	Results []string
+	Query   string
+}
+
+type ProfileLoadedMsg struct {
+	Profile core.SoClProfile
+}
+
+type SettingsLoadedMsg struct {
+	Username     string
+	LANDiscovery bool
+}
+
+type UsernameUpdatedMsg struct {
+	Username string
+}
+
+type PFPRegeneratedMsg struct {
+	PFP string
+}
+
+type LANDiscoveryToggledMsg struct {
+	Enabled bool
+}
+
 // SoClModel is Bubble Tea model for so_cl.
 // It holds all application state:
 // - Posts (feed)
@@ -147,36 +192,81 @@ type SoClModel struct {
 	followInput string
 	// showFollowInput shows if follow input is visible
 	showFollowInput bool
+	// showFollowGraph shows if follow graph sidebar is visible
+	showFollowGraph bool
+	// following is the list of peers the current user follows
+	following []string
+	// followers is the list of peers following the current user
+	followers []string
+	// showSearchInput shows if search input is visible
+	showSearchInput bool
+	// searchQuery is the current search query
+	searchQuery string
+	// searchResults is the list of post references matching search
+	searchResults []string
+	// searchFilterType is the type of filter (text, hashtag, author)
+	searchFilterType string
+	// showSearchResults shows if search results are visible
+	showSearchResults bool
+	// showProfile shows if profile view is visible
+	showProfile bool
+	// profile is the currently viewed profile
+	profile core.SoClProfile
+	// showSettings shows if settings view is visible
+	showSettings bool
+	// settingsUsername is the current username
+	settingsUsername string
+	// settingsLANDiscovery is the current LAN discovery setting
+	settingsLANDiscovery bool
+	// settingsInput shows if user is entering a setting value
+	settingsInput string
+	// settingsEditing shows which setting is being edited
+	settingsEditing string
 }
 
 // NewSoClModel creates a new SoClModel with default state.
 func NewSoClModel(svc ScuttlegoService) *SoClModel {
 	return &SoClModel{
-		scuttlego:        svc,
-		posts:            []Post{},
-		composerText:     "",
-		peers:            []string{},
-		width:            0,
-		height:           0,
-		cursor:           0,
-		editing:          false,
-		loading:          false,
-		publishing:       false,
-		errorMsg:         "",
-		connectedPeers:   []scuttlego.Peer{},
-		showPeers:        false,
-		showTrending:     false,
-		showMentions:     false,
-		trendingHashtags: []core.TrendingHashtag{},
-		mentions:         []string{},
-		unreadMentions:   0,
-		replyInput:       "",
-		showReplyInput:   false,
-		replyingTo:       "",
-		inviteInput:      "",
-		showInviteInput:  false,
-		followInput:      "",
-		showFollowInput:  false,
+		scuttlego:            svc,
+		posts:                []Post{},
+		composerText:         "",
+		peers:                []string{},
+		width:                0,
+		height:               0,
+		cursor:               0,
+		editing:              false,
+		loading:              false,
+		publishing:           false,
+		errorMsg:             "",
+		connectedPeers:       []scuttlego.Peer{},
+		showPeers:            false,
+		showTrending:         false,
+		showMentions:         false,
+		trendingHashtags:     []core.TrendingHashtag{},
+		mentions:             []string{},
+		unreadMentions:       0,
+		replyInput:           "",
+		showReplyInput:       false,
+		replyingTo:           "",
+		inviteInput:          "",
+		showInviteInput:      false,
+		followInput:          "",
+		showFollowInput:      false,
+		showFollowGraph:      false,
+		following:            []string{},
+		followers:            []string{},
+		showSearchInput:      false,
+		searchQuery:          "",
+		searchResults:        []string{},
+		searchFilterType:     "text",
+		showSearchResults:    false,
+		showProfile:          false,
+		profile:              core.SoClProfile{},
+		showSettings:         false,
+		settingsUsername:     "",
+		settingsLANDiscovery: true,
+		settingsInput:        "",
+		settingsEditing:      "",
 	}
 }
 
@@ -188,6 +278,7 @@ func (m *SoClModel) Init() tea.Cmd {
 		m.loadPeers(),
 		m.loadTrending(),
 		m.loadMentions(),
+		m.loadFollowGraph(),
 	)
 }
 
@@ -224,6 +315,37 @@ func (m *SoClModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showFollowInput = false
 		m.followInput = ""
 		m.errorMsg = "Followed successfully"
+		return m, m.loadFollowGraph()
+	case UnfollowedMsg:
+		m.errorMsg = "Unfollowed successfully"
+		return m, m.loadFollowGraph()
+	case FollowGraphLoadedMsg:
+		m.following = msg.Following
+		m.followers = msg.Followers
+		return m, nil
+	case SearchResultsLoadedMsg:
+		m.searchResults = msg.Results
+		m.searchQuery = msg.Query
+		m.showSearchResults = true
+		return m, nil
+	case ProfileLoadedMsg:
+		m.profile = msg.Profile
+		m.showProfile = true
+		return m, nil
+	case SettingsLoadedMsg:
+		m.settingsUsername = msg.Username
+		m.settingsLANDiscovery = msg.LANDiscovery
+		return m, nil
+	case UsernameUpdatedMsg:
+		m.settingsUsername = msg.Username
+		m.errorMsg = "Username updated successfully"
+		return m, nil
+	case PFPRegeneratedMsg:
+		m.errorMsg = "PFP regenerated successfully"
+		return m, nil
+	case LANDiscoveryToggledMsg:
+		m.settingsLANDiscovery = msg.Enabled
+		m.errorMsg = fmt.Sprintf("LAN discovery %s", map[bool]string{true: "enabled", false: "disabled"}[msg.Enabled])
 		return m, nil
 	case TrendingLoadedMsg:
 		m.trendingHashtags = msg.Hashtags
@@ -312,7 +434,7 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return nil
 
 	case tea.KeyF5:
-		// Like the selected post
+		// Like selected post
 		if len(m.posts) > 0 && m.cursor < len(m.posts) {
 			postRef := m.posts[m.cursor].Ref
 			if postRef != "" {
@@ -338,8 +460,60 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		}
 		return nil
 
+	case tea.KeyF8:
+		// Toggle search input
+		m.showSearchInput = !m.showSearchInput
+		m.searchQuery = ""
+		return nil
+
+	case tea.KeyF9:
+		// Toggle profile view
+		m.showProfile = !m.showProfile
+		if m.showProfile {
+			myFeedRef := m.scuttlego.GetIdentity()
+			return m.loadProfile(myFeedRef)
+		}
+		return nil
+
+	case tea.KeyF10:
+		// Toggle settings view
+		m.showSettings = !m.showSettings
+		if m.showSettings {
+			return m.loadSettings()
+		}
+		return nil
+
+	case tea.KeyF11:
+		// Toggle follow graph sidebar
+		m.showFollowGraph = !m.showFollowGraph
+		if m.showFollowGraph {
+			return m.loadFollowGraph()
+		}
+		return nil
+
 	case tea.KeyEnter:
-		if m.showInviteInput {
+		if m.showSettings && m.settingsEditing != "" {
+			// Save setting value
+			value := m.settingsInput
+			m.settingsInput = ""
+			m.settingsEditing = ""
+			switch m.settingsEditing {
+			case "username":
+				return m.updateUsername(value)
+			case "pfp":
+				return m.regeneratePFP()
+			case "lan":
+				enabled := value == "y" || value == "yes" || value == "1"
+				return m.toggleLANDiscovery(enabled)
+			}
+			return nil
+		} else if m.showSearchInput {
+			// Perform search
+			query := m.searchQuery
+			m.searchQuery = ""
+			m.showSearchInput = false
+			return m.performSearch(query)
+		} else if m.showInviteInput {
 			// Redeem invite
 			inviteCode := m.inviteInput
 			m.inviteInput = ""
@@ -425,7 +599,48 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		if m.showFollowInput && len(m.followInput) > 0 {
 			m.followInput = m.followInput[:len(m.followInput)-1]
 		}
+		if m.showSearchInput && len(m.searchQuery) > 0 {
+			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+		}
+		if m.showSettings && len(m.settingsInput) > 0 {
+			m.settingsInput = m.settingsInput[:len(m.settingsInput)-1]
+		}
 		return nil
+
+	case tea.KeyTab:
+		// Switch search filter type
+		if m.showSearchInput {
+			types := []string{"text", "hashtag", "author"}
+			for i, t := range types {
+				if t == m.searchFilterType {
+					m.searchFilterType = types[(i+1)%len(types)]
+					break
+				}
+			}
+		}
+		return nil
+
+	case tea.KeyRunes:
+		// Handle single-character settings commands
+		if len(msg.Runes) == 1 && m.showSettings && m.settingsEditing == "" {
+			switch msg.Runes[0] {
+			case '1':
+				// Edit username setting
+				m.settingsEditing = "username"
+				m.settingsInput = m.settingsUsername
+				return nil
+			case '2':
+				// Toggle LAN discovery setting
+				m.settingsEditing = "lan"
+				m.settingsInput = map[bool]string{true: "y", false: "n"}[m.settingsLANDiscovery]
+				return nil
+			case '3':
+				// Regenerate PFP setting
+				return m.regeneratePFP()
+			}
+		}
+		// Fall through to typing
+		fallthrough
 
 	default:
 		// Typing
@@ -440,6 +655,12 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		}
 		if m.showFollowInput && len(msg.Runes) > 0 {
 			m.followInput += string(msg.Runes)
+		}
+		if m.showSearchInput && len(msg.Runes) > 0 {
+			m.searchQuery += string(msg.Runes)
+		}
+		if m.showSettings && len(msg.Runes) > 0 && m.settingsEditing != "" {
+			m.settingsInput += string(msg.Runes)
 		}
 		return nil
 	}
@@ -514,6 +735,17 @@ func (m *SoClModel) followPeer(feedRef string) tea.Cmd {
 	}
 }
 
+func (m *SoClModel) unfollowPeer(feedRef string) tea.Cmd {
+	return func() tea.Msg {
+		err := m.scuttlego.Unfollow(feedRef)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		return UnfollowedMsg{FeedRef: feedRef}
+	}
+}
+
 func (m *SoClModel) loadTrending() tea.Cmd {
 	return func() tea.Msg {
 		hashtags, err := m.scuttlego.GetTopHashtags(10)
@@ -535,6 +767,53 @@ func (m *SoClModel) loadMentions() tea.Cmd {
 		}
 
 		return MentionsLoadedMsg{Mentions: mentions}
+	}
+}
+
+func (m *SoClModel) loadFollowGraph() tea.Cmd {
+	return func() tea.Msg {
+		myFeedRef := m.scuttlego.GetIdentity()
+		following, err := m.scuttlego.GetFollowing(myFeedRef)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		followers, err := m.scuttlego.GetFollowers(myFeedRef)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		return FollowGraphLoadedMsg{
+			Following: following,
+			Followers: followers,
+		}
+	}
+}
+
+func (m *SoClModel) performSearch(query string) tea.Cmd {
+	return func() tea.Msg {
+		var results []string
+		var err error
+
+		switch m.searchFilterType {
+		case "text":
+			results, err = m.scuttlego.SearchPosts(query)
+		case "hashtag":
+			results, err = m.scuttlego.FilterByHashtag(query)
+		case "author":
+			results, err = m.scuttlego.FilterByAuthor(query)
+		default:
+			results, err = m.scuttlego.SearchPosts(query)
+		}
+
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		return SearchResultsLoadedMsg{
+			Results: results,
+			Query:   query,
+		}
 	}
 }
 
@@ -592,6 +871,10 @@ func (m *SoClModel) View() string {
 		result += "\n\n" + m.renderFollowInput()
 	}
 
+	if m.showSearchInput {
+		result += "\n\n" + m.renderSearchInput()
+	}
+
 	if m.showPeers {
 		result += "\n\n" + m.renderSidebar()
 	}
@@ -602,6 +885,22 @@ func (m *SoClModel) View() string {
 
 	if m.showMentions {
 		result += "\n\n" + m.renderMentions()
+	}
+
+	if m.showFollowGraph {
+		result += "\n\n" + m.renderFollowGraph()
+	}
+
+	if m.showSearchResults {
+		result += "\n\n" + m.renderSearchResults()
+	}
+
+	if m.showProfile {
+		result += "\n\n" + m.renderProfile()
+	}
+
+	if m.showSettings {
+		result += "\n\n" + m.renderSettings()
 	}
 
 	result += "\n\n" + m.renderFooter()
@@ -620,7 +919,7 @@ func (m *SoClModel) renderHeader() string {
 
 // renderFooter renders the footer with key bindings.
 func (m *SoClModel) renderFooter() string {
-	footer := "F1: Peers | F2: Invite | F3: Follow | F4: Reply | F5: Like | F6: Trending | F7: Mentions"
+	footer := "F1: Peers | F2: Invite | F3: Follow | F4: Reply | F5: Like | F6: Trending | F7: Mentions | F8: Search | F9: Profile | F10: Settings | F11: Follow Graph"
 	if m.errorMsg != "" {
 		footer += fmt.Sprintf("\n%s", m.errorMsg)
 	}
@@ -754,4 +1053,159 @@ func (m *SoClModel) renderMentions() string {
 	}
 
 	return list
+}
+
+// renderFollowGraph renders the follow/followers sidebar.
+func (m *SoClModel) renderFollowGraph() string {
+	var sidebar string
+	sidebar += "=== Follow Graph ===\n\n"
+
+	sidebar += fmt.Sprintf("Following: %d\n", len(m.following))
+	for i, f := range m.following {
+		sidebar += fmt.Sprintf("  %d. %s\n", i+1, truncateFeedRef(f))
+	}
+
+	sidebar += fmt.Sprintf("\nFollowers: %d\n", len(m.followers))
+	for i, f := range m.followers {
+		sidebar += fmt.Sprintf("  %d. %s\n", i+1, truncateFeedRef(f))
+	}
+
+	return sidebar
+}
+
+// truncateFeedRef truncates a feed reference for display.
+func truncateFeedRef(feedRef string) string {
+	if len(feedRef) <= 20 {
+		return feedRef
+	}
+	return feedRef[:20] + "..."
+}
+
+// renderSearchInput renders the search input area.
+func (m *SoClModel) renderSearchInput() string {
+	return fmt.Sprintf("=== Search ===\n> %s\n\nFilter: %s (Tab to switch)\nPress Enter to search, F8 to cancel",
+		m.searchQuery,
+		m.searchFilterType,
+	)
+}
+
+// renderSearchResults renders the search results.
+func (m *SoClModel) renderSearchResults() string {
+	if len(m.searchResults) == 0 {
+		return fmt.Sprintf("=== Search Results ===\n\nNo results for: %s\n\nPress F8 to search again", m.searchQuery)
+	}
+
+	var results string
+	results += fmt.Sprintf("=== Search Results (%s) ===\n\n", m.searchFilterType)
+
+	for i, ref := range m.searchResults {
+		results += fmt.Sprintf("  %d. %s\n", i+1, ref)
+	}
+
+	results += "\nPress F8 to search again"
+	return results
+}
+
+// loadProfile loads a user's profile.
+func (m *SoClModel) loadProfile(feedRef string) tea.Cmd {
+	return func() tea.Msg {
+		// Get following/followers counts
+		followingCount, _ := m.scuttlego.GetFollowingCount(feedRef)
+		followersCount, _ := m.scuttlego.GetFollowersCount(feedRef)
+
+		// Get user's posts (simplified - just count for now)
+		// TODO: Get actual posts by author
+		postCount := 0
+
+		profile := core.SoClProfile{
+			FeedRef:        feedRef,
+			Username:       feedRef,
+			PFP:            core.GeneratePFP(feedRef),
+			Bio:            "",
+			FollowingCount: followingCount,
+			FollowersCount: followersCount,
+			PostCount:      postCount,
+		}
+
+		return ProfileLoadedMsg{Profile: profile}
+	}
+}
+
+// renderProfile renders the profile view.
+func (m *SoClModel) renderProfile() string {
+	var profile string
+	profile += "=== Profile ===\n\n"
+	profile += fmt.Sprintf("Feed Ref: %s\n", m.profile.FeedRef)
+	profile += fmt.Sprintf("PFP:\n%s\n", m.profile.PFP)
+	profile += fmt.Sprintf("Following: %d\n", m.profile.FollowingCount)
+	profile += fmt.Sprintf("Followers: %d\n", m.profile.FollowersCount)
+	profile += fmt.Sprintf("Posts: %d\n", m.profile.PostCount)
+
+	if m.profile.Bio != "" {
+		profile += fmt.Sprintf("Bio: %s\n", m.profile.Bio)
+	}
+
+	profile += "\nPress F9 to close profile"
+	return profile
+}
+
+// loadSettings loads the current settings.
+func (m *SoClModel) loadSettings() tea.Cmd {
+	return func() tea.Msg {
+		// Get current username from BadgerDB (simplified)
+		// TODO: Implement proper settings storage
+		username := m.settingsUsername
+		if username == "" {
+			username = m.scuttlego.GetIdentity()
+		}
+
+		return SettingsLoadedMsg{
+			Username:     username,
+			LANDiscovery: m.settingsLANDiscovery,
+		}
+	}
+}
+
+// renderSettings renders the settings view.
+func (m *SoClModel) renderSettings() string {
+	var settings string
+	settings += "=== Settings ===\n\n"
+
+	settings += fmt.Sprintf("1. Username: %s\n", m.settingsUsername)
+	settings += fmt.Sprintf("2. LAN Discovery: %s\n", map[bool]string{true: "Enabled", false: "Disabled"}[m.settingsLANDiscovery])
+	settings += fmt.Sprintf("3. Regenerate PFP\n")
+
+	if m.settingsEditing != "" {
+		settings += fmt.Sprintf("\nEditing: %s\n> %s\n", m.settingsEditing, m.settingsInput)
+		settings += "Press Enter to save, Esc to cancel"
+	} else {
+		settings += "\nPress 1-3 to edit, F10 to close"
+	}
+
+	return settings
+}
+
+// updateUsername updates the username.
+func (m *SoClModel) updateUsername(username string) tea.Cmd {
+	return func() tea.Msg {
+		// TODO: Store username in BadgerDB
+		return UsernameUpdatedMsg{Username: username}
+	}
+}
+
+// regeneratePFP regenerates the ASCII profile picture.
+func (m *SoClModel) regeneratePFP() tea.Cmd {
+	return func() tea.Msg {
+		myFeedRef := m.scuttlego.GetIdentity()
+		pfp := core.GeneratePFP(myFeedRef)
+		return PFPRegeneratedMsg{PFP: pfp}
+	}
+}
+
+// toggleLANDiscovery toggles LAN discovery.
+func (m *SoClModel) toggleLANDiscovery(enabled bool) tea.Cmd {
+	return func() tea.Msg {
+		// TODO: Implement actual LAN discovery toggle
+		return LANDiscoveryToggledMsg{Enabled: enabled}
+	}
 }

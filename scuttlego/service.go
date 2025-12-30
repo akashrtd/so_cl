@@ -25,9 +25,10 @@ import (
 )
 
 type Service struct {
-	config  Config
-	logger  *zap.Logger
-	indexer *indexes.Indexer
+	config   Config
+	logger   *zap.Logger
+	indexer  *indexes.Indexer
+	identity *identity.Private
 
 	svc     *service.Service
 	cleanup func()
@@ -83,19 +84,21 @@ func NewService(cfg Config, logger *zap.Logger) (*Service, error) {
 			zap.Error(err),
 		)
 		return &Service{
-			config:  cfg,
-			logger:  logger,
-			svc:     &svc,
-			cleanup: cleanup,
+			config:   cfg,
+			logger:   logger,
+			identity: &privateIdentity,
+			svc:      &svc,
+			cleanup:  cleanup,
 		}, nil
 	}
 
 	return &Service{
-		config:  cfg,
-		logger:  logger,
-		indexer: indexes.NewIndexer(indexDB),
-		svc:     &svc,
-		cleanup: cleanup,
+		config:   cfg,
+		logger:   logger,
+		indexer:  indexes.NewIndexer(indexDB),
+		identity: &privateIdentity,
+		svc:      &svc,
+		cleanup:  cleanup,
 	}, nil
 }
 
@@ -300,7 +303,79 @@ func (s *Service) Follow(feedRef string) error {
 		return fmt.Errorf("failed to follow: %w", err)
 	}
 
+	// Index the follow relationship
+	if s.indexer != nil {
+		myFeedRef := s.GetIdentity()
+		if myFeedRef != "" {
+			if err := s.indexer.IndexFollow(myFeedRef, feedRef); err != nil {
+				s.logger.Warn("Failed to index follow relationship",
+					zap.String("follower", myFeedRef),
+					zap.String("following", feedRef),
+					zap.Error(err),
+				)
+			}
+		}
+	}
+
 	return nil
+}
+
+// Unfollow unfollows a peer by publishing a contact message with following: false.
+func (s *Service) Unfollow(feedRef string) error {
+	s.logger.Info("Unfollowing peer",
+		zap.String("feed_ref", feedRef),
+	)
+
+	// Publish a contact message with following: false
+	content := map[string]interface{}{
+		"type":      "contact",
+		"contact":   feedRef,
+		"following": false,
+	}
+
+	contentJSON, err := json.Marshal(content)
+	if err != nil {
+		return fmt.Errorf("failed to marshal content: %w", err)
+	}
+
+	rawContent, err := message.NewRawContent(contentJSON)
+	if err != nil {
+		return fmt.Errorf("failed to create raw content: %w", err)
+	}
+
+	cmd, err := commands.NewPublishRaw(rawContent.Bytes())
+	if err != nil {
+		return fmt.Errorf("failed to create publish command: %w", err)
+	}
+
+	_, err = s.svc.App.Commands.PublishRaw.Handle(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to publish unfollow: %w", err)
+	}
+
+	// Remove the follow relationship from index
+	if s.indexer != nil {
+		myFeedRef := s.GetIdentity()
+		if myFeedRef != "" {
+			if err := s.indexer.Unfollow(myFeedRef, feedRef); err != nil {
+				s.logger.Warn("Failed to remove follow relationship",
+					zap.String("follower", myFeedRef),
+					zap.String("following", feedRef),
+					zap.Error(err),
+				)
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetIdentity returns the current user's feed reference.
+func (s *Service) GetIdentity() string {
+	if s.identity == nil {
+		return ""
+	}
+	return s.identity.Public().String()
 }
 
 func (s *Service) Connect(address string) error {
@@ -553,4 +628,101 @@ func (s *Service) GetMentions(feedRef string) ([]string, error) {
 	}
 
 	return mentions, nil
+}
+
+// GetFollowing retrieves the list of peers that a user is following.
+func (s *Service) GetFollowing(feedRef string) ([]string, error) {
+	if s.indexer == nil {
+		return []string{}, nil
+	}
+
+	following, err := s.indexer.GetFollowing(feedRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get following: %w", err)
+	}
+
+	return following, nil
+}
+
+// GetFollowers retrieves the list of peers following a user.
+func (s *Service) GetFollowers(feedRef string) ([]string, error) {
+	if s.indexer == nil {
+		return []string{}, nil
+	}
+
+	followers, err := s.indexer.GetFollowers(feedRef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get followers: %w", err)
+	}
+
+	return followers, nil
+}
+
+// IsFollowing checks if a user is following another user.
+func (s *Service) IsFollowing(follower, following string) (bool, error) {
+	if s.indexer == nil {
+		return false, nil
+	}
+
+	return s.indexer.IsFollowing(follower, following)
+}
+
+// GetFollowingCount returns the number of peers a user is following.
+func (s *Service) GetFollowingCount(feedRef string) (int, error) {
+	if s.indexer == nil {
+		return 0, nil
+	}
+
+	return s.indexer.GetFollowingCount(feedRef)
+}
+
+// GetFollowersCount returns the number of followers a user has.
+func (s *Service) GetFollowersCount(feedRef string) (int, error) {
+	if s.indexer == nil {
+		return 0, nil
+	}
+
+	return s.indexer.GetFollowersCount(feedRef)
+}
+
+// SearchPosts searches for posts containing the given query string.
+func (s *Service) SearchPosts(query string) ([]string, error) {
+	if s.indexer == nil {
+		return []string{}, nil
+	}
+
+	results, err := s.indexer.SearchPosts(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search posts: %w", err)
+	}
+
+	return results, nil
+}
+
+// FilterByHashtag searches for posts containing a specific hashtag.
+func (s *Service) FilterByHashtag(hashtag string) ([]string, error) {
+	if s.indexer == nil {
+		return []string{}, nil
+	}
+
+	results, err := s.indexer.FilterByHashtag(hashtag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter by hashtag: %w", err)
+	}
+
+	return results, nil
+}
+
+// FilterByAuthor searches for posts by a specific author.
+func (s *Service) FilterByAuthor(author string) ([]string, error) {
+	if s.indexer == nil {
+		return []string{}, nil
+	}
+
+	results, err := s.indexer.FilterByAuthor(author)
+	if err != nil {
+		return nil, fmt.Errorf("failed to filter by author: %w", err)
+	}
+
+	return results, nil
 }

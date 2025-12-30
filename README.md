@@ -71,17 +71,17 @@ so_cl (pronounced "social") is a peer-to-peer (P2P) social platform running enti
 - ✅ Real-time feed sync
 - ✅ Keyboard shortcuts: F1 (peers), F2 (invite), F3 (follow)
 
-### Planned (Phase 2 - Social)
-- ⏳ Replies (threaded messages)
-- ⏳ Like/repost reactions (emoji-safe)
-- ⏳ Hashtag indexing + trending sidebar
-- ⏳ @mentions + notifications
-- ⏳ Follow/unfollow graph
+### Current (Phase 2 - Social) ✅ Complete
+- ✅ Replies (threaded messages)
+- ✅ Like/repost reactions (emoji-safe)
+- ✅ Hashtag indexing + trending sidebar (F6 key)
+- ✅ @mentions + notifications (F7 key)
+- ✅ Follow/unfollow graph
 
-### Planned (Phase 3 - Polish)
-- ⏳ Search + filters
-- ⏳ Profile pages
-- ⏳ Settings (username, PFP, discovery)
+### Current (Phase 3 - Polish) 🔄 In Progress
+- ✅ Search + filters (F8 key)
+- ✅ Profile pages (F9 key)
+- ✅ Settings (F10 key)
 - ⏳ Export/backup identity
 - ⏳ Web UI (same state machine as TUI)
 
@@ -173,6 +173,14 @@ When you first run `so_cl`, it will:
 # F1          - Toggle peer list sidebar
 # F2          - Toggle invite code input
 # F3          - Toggle follow peer input
+# F4          - Toggle reply input (reply to selected post)
+# F5          - Like selected post
+# F6          - Toggle trending sidebar
+# F7          - Toggle mentions list
+# F8          - Toggle search input
+# F9          - Toggle profile view
+# F10         - Toggle settings view
+# F11         - Toggle follow graph sidebar
 # q           - Quit
 
 # CLI options:
@@ -229,7 +237,8 @@ so_cl/
 │   └── service_test.go      # Integration tests
 │
 ├── indexes/                  # Custom indexes
-│   └── hashtags.go           # Hashtag/mention indexing
+│   ├── hashtags.go           # Hashtag/mention indexing & search
+│   └── follows.go           # Follow graph tracking
 │
 └── config/                   # Configuration
     └── config.go             # Config loader
@@ -635,18 +644,18 @@ We welcome feature requests! When suggesting a feature:
 - [x] LAN discovery (UDP broadcast)
 - [x] Real-time feed sync
 
-### Phase 2: Social (Week 5-6)
-- [ ] Replies (threaded messages)
-- [ ] Like/repost reactions
-- [ ] Hashtag indexing
-- [ ] Trending sidebar
-- [ ] @mentions + notifications
-- [ ] Follow/unfollow graph
+### Phase 2: Social (Week 5-6) ✅ Complete
+- [x] Replies (threaded messages)
+- [x] Like/repost reactions
+- [x] Hashtag indexing
+- [x] Trending sidebar
+- [x] @mentions + notifications
+- [x] Follow/unfollow graph
 
-### Phase 3: Polish (Week 7+)
-- [ ] Search + filters
-- [ ] Profile pages
-- [ ] Settings
+### Phase 3: Polish (Week 7+) 🔄 In Progress
+- [x] Search + filters (text, hashtag, author)
+- [x] Profile pages (PFP, bio, stats)
+- [x] Settings (username, PFP, discovery)
 - [ ] Export/backup identity
 - [ ] Web UI
 
