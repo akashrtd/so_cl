@@ -16,6 +16,7 @@ import (
 	scuttlegodi "github.com/planetary-social/scuttlego/service/di"
 	"github.com/planetary-social/scuttlego/service/domain/feeds/message"
 	"github.com/planetary-social/scuttlego/service/domain/identity"
+	"github.com/planetary-social/scuttlego/service/domain/invites"
 	"github.com/planetary-social/scuttlego/service/domain/network"
 	"github.com/planetary-social/scuttlego/service/domain/refs"
 	"github.com/yourusername/so_cl/indexes"
@@ -314,4 +315,55 @@ type Message struct {
 	Author string
 	Text   string
 	Time   int
+}
+
+// RedeemInvite redeems an invite code to follow a peer.
+// Invite code format: ssb:feed/invite/...
+func (s *Service) RedeemInvite(inviteCode string) error {
+	s.logger.Info("Redeeming invite code",
+		zap.String("invite", inviteCode),
+	)
+
+	// Parse invite code using invites package
+	invite, err := invites.NewInviteFromString(inviteCode)
+	if err != nil {
+		return fmt.Errorf("failed to parse invite code: %w", err)
+	}
+
+	// Redeem the invite (requires context)
+	cmd := commands.RedeemInvite{Invite: invite}
+	ctx := context.Background()
+	err = s.svc.App.Commands.RedeemInvite.Handle(ctx, cmd)
+	if err != nil {
+		return fmt.Errorf("failed to redeem invite: %w", err)
+	}
+
+	return nil
+}
+
+// GetPeers returns the list of connected peers.
+func (s *Service) GetPeers() ([]Peer, error) {
+	s.logger.Info("Getting connected peers")
+
+	// Get network status (Status query takes no arguments)
+	status, err := s.svc.App.Queries.Status.Handle()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status: %w", err)
+	}
+
+	peers := make([]Peer, 0, len(status.Peers))
+	for _, p := range status.Peers {
+		peers = append(peers, Peer{
+			Address: p.Identity.String(),
+			State:   "connected",
+		})
+	}
+
+	return peers, nil
+}
+
+// Peer represents a connected peer.
+type Peer struct {
+	Address string
+	State   string
 }

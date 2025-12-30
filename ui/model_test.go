@@ -13,6 +13,7 @@ type mockScuttlegoService struct {
 	publishResult string
 	publishErr    error
 	messages      []scuttlego.Message
+	peers         []scuttlego.Peer
 }
 
 func (m *mockScuttlegoService) Publish(text string) (string, error) {
@@ -24,6 +25,22 @@ func (m *mockScuttlegoService) GetRecentMessages(limit int) ([]scuttlego.Message
 		return m.messages[:limit], nil
 	}
 	return m.messages, nil
+}
+
+func (m *mockScuttlegoService) Follow(feedRef string) error {
+	return nil
+}
+
+func (m *mockScuttlegoService) Connect(address string) error {
+	return nil
+}
+
+func (m *mockScuttlegoService) RedeemInvite(inviteCode string) error {
+	return nil
+}
+
+func (m *mockScuttlegoService) GetPeers() ([]scuttlego.Peer, error) {
+	return m.peers, nil
 }
 
 func TestNewSoClModel(t *testing.T) {

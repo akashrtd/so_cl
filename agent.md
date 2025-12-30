@@ -4,7 +4,7 @@
 
 **Last Updated**: 2025-12-30
 **Project Phase**: Phase 1 (P2P) ✅ Phase 0 Complete
-**Status**: Phase 0 completed, ready for P2P features (invite codes, peer connections, EBT replication)
+**Status**: Phase 1 P2P features partially implemented
 
 ---
 
