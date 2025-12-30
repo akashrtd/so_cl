@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	badger "github.com/dgraph-io/badger/v3"
 	"github.com/planetary-social/scuttlego/service"
 	"github.com/planetary-social/scuttlego/service/app/commands"
 	"github.com/planetary-social/scuttlego/service/app/common"
@@ -17,12 +18,14 @@ import (
 	"github.com/planetary-social/scuttlego/service/domain/identity"
 	"github.com/planetary-social/scuttlego/service/domain/network"
 	"github.com/planetary-social/scuttlego/service/domain/refs"
+	"github.com/yourusername/so_cl/indexes"
 	"go.uber.org/zap"
 )
 
 type Service struct {
-	config Config
-	logger *zap.Logger
+	config  Config
+	logger  *zap.Logger
+	indexer *indexes.Indexer
 
 	svc     *service.Service
 	cleanup func()
@@ -67,9 +70,25 @@ func NewService(cfg Config, logger *zap.Logger) (*Service, error) {
 		return nil, fmt.Errorf("failed to build scuttlego service: %w", err)
 	}
 
+	// Open BadgerDB for indexes
+	indexesDir := filepath.Join(cfg.DataDir, "indexes")
+	indexDB, err := badger.Open(badger.DefaultOptions(indexesDir))
+	if err != nil {
+		logger.Warn("Failed to open indexes database, indexing disabled",
+			zap.Error(err),
+		)
+		return &Service{
+			config:  cfg,
+			logger:  logger,
+			svc:     &svc,
+			cleanup: cleanup,
+		}, nil
+	}
+
 	return &Service{
 		config:  cfg,
 		logger:  logger,
+		indexer: indexes.NewIndexer(indexDB),
 		svc:     &svc,
 		cleanup: cleanup,
 	}, nil
@@ -98,6 +117,14 @@ func (s *Service) Close() error {
 
 	if s.cleanup != nil {
 		s.cleanup()
+	}
+
+	if s.indexer != nil {
+		if err := s.indexer.Close(); err != nil {
+			s.logger.Error("Failed to close indexer",
+				zap.Error(err),
+			)
+		}
 	}
 
 	return nil
@@ -139,6 +166,17 @@ func (s *Service) Publish(text string) (string, error) {
 	msgRef, err := s.svc.App.Commands.PublishRaw.Handle(cmd)
 	if err != nil {
 		return "", fmt.Errorf("failed to publish: %w", err)
+	}
+
+	// Index the post for hashtags and mentions
+	if s.indexer != nil {
+		ref := msgRef.String()
+		if err := s.indexer.IndexPost(ref, text); err != nil {
+			s.logger.Warn("Failed to index post",
+				zap.String("ref", ref),
+				zap.Error(err),
+			)
+		}
 	}
 
 	return msgRef.String(), nil
@@ -229,16 +267,6 @@ func (s *Service) GetRecentMessages(limit int) ([]Message, error) {
 			continue
 		}
 
-		known, hasKnown := logMsg.Message.Content().KnownContent()
-		if !hasKnown {
-			result = append(result, Message{
-				Author: author,
-				Text:   "(unknown content)",
-				Time:   logMsg.Sequence.Int(),
-			})
-			continue
-		}
-
 		postContent := make(map[string]interface{})
 		if err := json.Unmarshal(logMsg.Message.Content().Raw().Bytes(), &postContent); err == nil {
 			if text, ok := postContent["text"].(string); ok {
@@ -249,11 +277,32 @@ func (s *Service) GetRecentMessages(limit int) ([]Message, error) {
 				})
 				continue
 			}
+
+			contentType := ""
+			if ct, ok := postContent["type"].(string); ok {
+				contentType = ct
+			}
+			result = append(result, Message{
+				Author: author,
+				Text:   fmt.Sprintf("(%s)", contentType),
+				Time:   logMsg.Sequence.Int(),
+			})
+			continue
+		}
+
+		known, hasKnown := logMsg.Message.Content().KnownContent()
+		if hasKnown {
+			result = append(result, Message{
+				Author: author,
+				Text:   fmt.Sprintf("%s", known.Type()),
+				Time:   logMsg.Sequence.Int(),
+			})
+			continue
 		}
 
 		result = append(result, Message{
 			Author: author,
-			Text:   fmt.Sprintf("%s", known.Type()),
+			Text:   "(unknown content)",
 			Time:   logMsg.Sequence.Int(),
 		})
 	}

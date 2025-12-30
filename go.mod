@@ -6,6 +6,7 @@ require (
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/dgraph-io/badger/v3 v3.2103.5
 	github.com/planetary-social/scuttlego v0.0.4
+	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.1
 )
 
@@ -55,6 +56,7 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/zerolog v1.34.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
@@ -68,7 +70,6 @@ require (
 	github.com/ssbc/go-ssb-multiserver v0.1.5-0.20221019203850-917ae0e23d57 // indirect
 	github.com/ssbc/go-ssb-refs v0.5.2 // indirect
 	github.com/ssbc/margaret v0.4.4-0.20230125145533-1439efe21dc4 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
 	github.com/ugorji/go/codec v1.2.8 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/zeebo/bencode v1.0.0 // indirect
@@ -81,4 +82,5 @@ require (
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

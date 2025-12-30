@@ -2,9 +2,9 @@
 
 > **Purpose**: This file serves as a memory bank, reference point, and operational guide for AI agents working on the so_cl project. It ensures continuity across sessions and maintains high-quality coding standards.
 
-**Last Updated**: 2025-12-29
-**Project Phase**: Phase 0 (MVP)
-**Status**: Phase 0 core features completed, ready for P2P integration
+**Last Updated**: 2025-12-30
+**Project Phase**: Phase 1 (P2P) ✅ Phase 0 Complete
+**Status**: Phase 0 completed, ready for P2P features (invite codes, peer connections, EBT replication)
 
 ---
 
@@ -448,28 +448,28 @@ zap.L().Info("peer connected",
    - [x] Test key generation and signing
 
  - [x] **Post creation**
-   - [x] Build TUI composer (Bubble Tea input)
-   - [x] Validate 280-char limit
-   - [x] Build SSB post content (`message.NewRawContent`)
-   - [x] Publish via `scuttlego.App.Commands.PublishRaw`
-   - [ ] Index post for hashtags/mentions
-   - [ ] Optimistic UI update
-   - [ ] Test publish flow
+    - [x] Build TUI composer (Bubble Tea input)
+    - [x] Validate 280-char limit
+    - [x] Build SSB post content (`message.NewRawContent`)
+    - [x] Publish via `scuttlego.App.Commands.PublishRaw`
+    - [x] Index post for hashtags/mentions
+    - [x] Optimistic UI update
+    - [x] Test publish flow
 
- - [x] **Feed view**
-   - [x] Query posts via `scuttlego.App.Queries.ReceiveLog`
-   - [x] Format posts for TUI display
-   - [x] Show ASCII PFP (6x6 colors)
-   - [x] Show timestamp, author, text
-   - [ ] Implement pagination (100 posts max in memory)
-   - [ ] Test feed rendering
+  - [x] **Feed view**
+    - [x] Query posts via `scuttlego.App.Queries.ReceiveLog`
+    - [x] Format posts for TUI display
+    - [x] Show ASCII PFP (6x6 colors)
+    - [x] Show timestamp, author, text
+    - [x] Implement pagination (100 posts max in memory)
+    - [x] Test feed rendering
 
-- [x] **Static binary build**
-   - [x] Create `Makefile`
-   - [x] Build with `CGO_ENABLED=0`
-   - [x] Verify <50MB size (22MB achieved)
-   - [x] Test locally (macOS)
-   - [ ] Add `goreleaser` config
+  - [x] **Static binary build**
+    - [x] Create `Makefile`
+    - [x] Build with `CGO_ENABLED=0`
+    - [x] Verify <50MB size (22MB achieved)
+    - [x] Test locally (macOS)
+    - [x] Add `goreleaser` config
 
 ### 📋 **Phase 1: P2P (Week 3-4)**
 

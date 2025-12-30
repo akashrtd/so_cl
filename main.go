@@ -64,7 +64,7 @@ func main() {
 	}()
 
 	// Create Bubble Tea model
-	model := ui.NewSoClModel()
+	model := ui.NewSoClModel(scuttlegoService)
 
 	// Create Bubble Tea program
 	program := tea.NewProgram(

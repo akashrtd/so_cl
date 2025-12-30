@@ -10,7 +10,36 @@ import (
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/yourusername/so_cl/core"
+	"github.com/yourusername/so_cl/scuttlego"
 )
+
+const maxPostsInMemory = 100
+
+type ScuttlegoService interface {
+	Publish(text string) (string, error)
+	GetRecentMessages(limit int) ([]scuttlego.Message, error)
+}
+
+type Post struct {
+	Author string
+	Text   string
+	Time   int
+	pfp    string
+}
+
+type FeedLoadedMsg struct {
+	Posts []Post
+}
+
+type PostPublishedMsg struct {
+	Ref  string
+	Text string
+}
+
+type ErrorMsg struct {
+	Err error
+}
 
 // SoClModel is Bubble Tea model for so_cl.
 // It holds all application state:
@@ -19,8 +48,9 @@ import (
 // - Peers (sidebar)
 // - Configuration
 type SoClModel struct {
+	scuttlego ScuttlegoService
 	// posts is the feed of social media posts
-	posts []string
+	posts []Post
 	// composerText holds the text input for creating new posts
 	composerText string
 	// peers is the list of connected SSB peers
@@ -33,25 +63,35 @@ type SoClModel struct {
 	cursor int
 	// editing shows if user is currently typing a post
 	editing bool
+	// loading shows if feed is currently loading
+	loading bool
+	// publishing shows if a post is being published
+	publishing bool
+	// error shows any error message
+	errorMsg string
 }
 
 // NewSoClModel creates a new SoClModel with default state.
-func NewSoClModel() *SoClModel {
+func NewSoClModel(svc ScuttlegoService) *SoClModel {
 	return &SoClModel{
-		posts:        []string{},
+		scuttlego:    svc,
+		posts:        []Post{},
 		composerText: "",
 		peers:        []string{},
 		width:        0,
 		height:       0,
 		cursor:       0,
 		editing:      false,
+		loading:      false,
+		publishing:   false,
+		errorMsg:     "",
 	}
 }
 
 // Init is called at the start of the Bubble Tea program.
 // It performs initial setup like initial size calculation.
 func (m *SoClModel) Init() tea.Cmd {
-	return nil
+	return m.loadFeed()
 }
 
 // Update handles incoming events from Bubble Tea.
@@ -67,6 +107,19 @@ func (m *SoClModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+	case FeedLoadedMsg:
+		m.posts = msg.Posts
+		m.loading = false
+		m.publishing = false
+		return m, nil
+	case PostPublishedMsg:
+		m.publishing = false
+		return m, m.loadFeed()
+	case ErrorMsg:
+		m.errorMsg = msg.Err.Error()
+		m.loading = false
+		m.publishing = false
+		return m, nil
 	default:
 		return m, nil
 	}
@@ -79,12 +132,32 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return tea.Quit
 
 	case tea.KeyEnter:
-		if m.editing {
+		if m.editing && !m.publishing {
 			// Publish post
-			m.editing = false
-			// TODO: Call scuttlego publish command
-			m.posts = append(m.posts, m.composerText)
+			text := m.composerText
 			m.composerText = ""
+			m.editing = false
+			m.publishing = true
+
+			// Optimistic UI update: add post immediately
+			newPost := Post{
+				Author: "You",
+				Text:   text,
+				Time:   len(m.posts),
+				pfp:    core.GeneratePFP("optimistic"),
+			}
+			m.posts = append([]Post{newPost}, m.posts...)
+
+			// Trim to max posts in memory
+			if len(m.posts) > maxPostsInMemory {
+				m.posts = m.posts[:maxPostsInMemory]
+			}
+
+			m.cursor = 0
+
+			return m.publishPost(text)
+		} else if m.editing {
+			// Already publishing, ignore
 			return nil
 		} else {
 			// Start editing
@@ -122,11 +195,47 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	}
 }
 
+func (m *SoClModel) loadFeed() tea.Cmd {
+	return func() tea.Msg {
+		messages, err := m.scuttlego.GetRecentMessages(100)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		posts := make([]Post, len(messages))
+		for i, msg := range messages {
+			posts[i] = Post{
+				Author: msg.Author,
+				Text:   msg.Text,
+				Time:   msg.Time,
+				pfp:    core.GeneratePFP(msg.Author),
+			}
+		}
+
+		return FeedLoadedMsg{Posts: posts}
+	}
+}
+
+func (m *SoClModel) publishPost(text string) tea.Cmd {
+	return func() tea.Msg {
+		ref, err := m.scuttlego.Publish(text)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		return PostPublishedMsg{Ref: ref, Text: text}
+	}
+}
+
 // View renders the TUI to the terminal.
 // It uses basic formatting (Lip Gloss to be added).
 func (m *SoClModel) View() string {
 	if m.width == 0 {
 		return "Loading..."
+	}
+
+	if m.errorMsg != "" {
+		return fmt.Sprintf("Error: %s\n\nPress Ctrl+C to exit", m.errorMsg)
 	}
 
 	// TODO: Implement full UI rendering with Lip Gloss
@@ -141,6 +250,10 @@ func (m *SoClModel) View() string {
 
 // renderFeed renders the social media feed.
 func (m *SoClModel) renderFeed() string {
+	if m.loading {
+		return "Loading feed..."
+	}
+
 	if len(m.posts) == 0 {
 		return "No posts yet. Press Enter to type a post."
 	}
@@ -153,7 +266,9 @@ func (m *SoClModel) renderFeed() string {
 		if i == m.cursor {
 			prefix = "> "
 		}
-		feed += fmt.Sprintf("%s%d. %s\n", prefix, i+1, post)
+		feed += fmt.Sprintf("%s%d. %s\n", prefix, i+1, post.Author)
+		feed += post.pfp
+		feed += fmt.Sprintf("%s\n\n", post.Text)
 	}
 
 	return feed

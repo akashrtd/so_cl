@@ -9,7 +9,6 @@ package indexes
 import (
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	badger "github.com/dgraph-io/badger/v3"
