@@ -41,7 +41,7 @@ func main() {
 	defer cancel()
 
 	// Handle shutdown signals
-	go handleShutdownSignals(ctx, cancel, logger)
+	go handleShutdownSignals(cancel, logger)
 
 	// Initialize scuttlego service
 	scuttlegoService, err := scuttlego.NewService(
@@ -113,7 +113,7 @@ func initLogger(debug bool) *zap.Logger {
 }
 
 // handleShutdownSignals handles SIGINT and SIGTERM for graceful shutdown.
-func handleShutdownSignals(ctx context.Context, cancel context.CancelFunc, logger *zap.Logger) {
+func handleShutdownSignals(cancel context.CancelFunc, logger *zap.Logger) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
