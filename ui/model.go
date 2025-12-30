@@ -1,6 +1,6 @@
 package ui
 
-// Package ui provides ├── Bubble Tea UI for so_cl.
+// Package ui provides |-- Bubble Tea UI for so_cl.
 // It handles:
 // - Model (state machine)
 // - View (rendering)
@@ -8,13 +8,95 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/yourusername/so_cl/core"
 	"github.com/yourusername/so_cl/scuttlego"
 )
 
+// Page represents the different pages in the application
+type Page string
+
+const (
+	PageHome     Page = "home"
+	PageDiscover Page = "discover"
+	PagePeers    Page = "peers"
+	PageProfile  Page = "profile"
+	PageSettings Page = "settings"
+)
+
 const maxPostsInMemory = 100
+
+// LipGloss styles for the TUI
+var (
+	// Colors
+	primaryColor   = lipgloss.Color("#00ff00") // Green
+	secondaryColor = lipgloss.Color("#0088ff") // Blue
+	accentColor    = lipgloss.Color("#ffaa00") // Orange
+	dimColor       = lipgloss.Color("#666666") // Dim gray
+	borderColor    = lipgloss.Color("#444444") // Border gray
+
+	// Styles
+	headerStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ffffff")).
+			Background(lipgloss.Color("#222222")).
+			Padding(0, 1)
+
+	navStyle = lipgloss.NewStyle().
+			Width(20).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(borderColor).
+			Padding(1)
+
+	navItemStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#ffffff")).
+			Padding(0, 1)
+
+	navActiveStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#000000")).
+			Background(primaryColor).
+			Padding(0, 1).
+			Bold(true)
+
+	mainStyle = lipgloss.NewStyle().
+			Width(50).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(borderColor).
+			Padding(1)
+
+	sidebarStyle = lipgloss.NewStyle().
+			Width(30).
+			Border(lipgloss.NormalBorder()).
+			BorderForeground(borderColor).
+			Padding(1)
+
+	sectionTitleStyle = lipgloss.NewStyle().
+				Foreground(secondaryColor).
+				Bold(true).
+				Underline(true)
+
+	postStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(dimColor).
+			Padding(0, 1).
+			MarginBottom(1)
+
+	selectedPostStyle = lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(primaryColor).
+				Padding(0, 1).
+				MarginBottom(1)
+
+	buttonStyle = lipgloss.NewStyle().
+			Foreground(secondaryColor).
+			Padding(0, 1)
+
+	footerStyle = lipgloss.NewStyle().
+			Foreground(dimColor).
+			Padding(0, 1)
+)
 
 type ScuttlegoService interface {
 	Publish(text string) (string, error)
@@ -142,6 +224,7 @@ type LANDiscoveryToggledMsg struct {
 // - Composer (post input)
 // - Peers (sidebar)
 // - Configuration
+// - Page navigation
 type SoClModel struct {
 	scuttlego ScuttlegoService
 	// posts is the feed of social media posts
@@ -222,6 +305,12 @@ type SoClModel struct {
 	settingsInput string
 	// settingsEditing shows which setting is being edited
 	settingsEditing string
+	// currentPage is the currently active page
+	currentPage Page
+	// navCursor is the cursor position in the navigation menu
+	navCursor int
+	// appVersion is the application version
+	appVersion string
 }
 
 // NewSoClModel creates a new SoClModel with default state.
@@ -267,6 +356,9 @@ func NewSoClModel(svc ScuttlegoService) *SoClModel {
 		settingsLANDiscovery: true,
 		settingsInput:        "",
 		settingsEditing:      "",
+		currentPage:          PageHome,
+		navCursor:            0,
+		appVersion:           "v0.1.5",
 	}
 }
 
@@ -398,6 +490,194 @@ func (m *SoClModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKeyMsg handles keyboard input.
 func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	// If editing any input field, handle input first
+	if m.editing || m.showReplyInput || m.showInviteInput || m.showFollowInput || m.showSearchInput || (m.showSettings && m.settingsEditing != "") {
+		return m.handleInputKeyMsg(msg)
+	}
+
+	// Otherwise, handle navigation
+	return m.handleNavigationKeyMsg(msg)
+}
+
+// handleInputKeyMsg handles keyboard input when editing text fields.
+func (m *SoClModel) handleInputKeyMsg(msg tea.KeyMsg) tea.Cmd {
+	switch msg.Type {
+	case tea.KeyCtrlC, tea.KeyEsc:
+		// Cancel editing
+		m.editing = false
+		m.showReplyInput = false
+		m.showInviteInput = false
+		m.showFollowInput = false
+		m.showSearchInput = false
+		if m.showSettings {
+			m.settingsEditing = ""
+			m.settingsInput = ""
+		}
+		return nil
+
+	case tea.KeyEnter:
+		if m.showSettings && m.settingsEditing != "" {
+			// Save setting value
+			value := m.settingsInput
+			m.settingsInput = ""
+			m.settingsEditing = ""
+			switch m.settingsEditing {
+			case "username":
+				return m.updateUsername(value)
+			case "pfp":
+				return m.regeneratePFP()
+			case "lan":
+				enabled := value == "y" || value == "yes" || value == "1"
+				return m.toggleLANDiscovery(enabled)
+			}
+			return nil
+		} else if m.showSearchInput {
+			// Perform search
+			query := m.searchQuery
+			m.searchQuery = ""
+			m.showSearchInput = false
+			return m.performSearch(query)
+		} else if m.showInviteInput {
+			// Redeem invite
+			inviteCode := m.inviteInput
+			m.inviteInput = ""
+			m.showInviteInput = false
+			return m.redeemInvite(inviteCode)
+		} else if m.showFollowInput {
+			// Follow peer
+			feedRef := m.followInput
+			m.followInput = ""
+			m.showFollowInput = false
+			return m.followPeer(feedRef)
+		} else if m.showReplyInput {
+			// Publish reply
+			text := m.replyInput
+			root := m.replyingTo
+			branch := m.replyingTo
+			m.replyInput = ""
+			m.showReplyInput = false
+			m.replyingTo = ""
+			return m.replyPost(text, root, branch)
+		} else if m.editing && !m.publishing {
+			// Publish post
+			text := m.composerText
+			m.composerText = ""
+			m.editing = false
+			m.publishing = true
+
+			// Optimistic UI update: add post immediately
+			newPost := Post{
+				Ref:       "",
+				Author:    "You",
+				Text:      text,
+				Time:      len(m.posts),
+				pfp:       core.GeneratePFP("optimistic"),
+				Root:      "",
+				Branch:    "",
+				LikeCount: 0,
+			}
+			m.posts = append([]Post{newPost}, m.posts...)
+
+			// Trim to max posts in memory
+			if len(m.posts) > maxPostsInMemory {
+				m.posts = m.posts[:maxPostsInMemory]
+			}
+
+			m.cursor = 0
+
+			return m.publishPost(text)
+		} else if m.editing {
+			// Already publishing, ignore
+			return nil
+		} else {
+			// Start editing
+			m.editing = true
+			return nil
+		}
+
+	case tea.KeyBackspace:
+		// Delete last character
+		if m.editing && len(m.composerText) > 0 {
+			m.composerText = m.composerText[:len(m.composerText)-1]
+		}
+		if m.showReplyInput && len(m.replyInput) > 0 {
+			m.replyInput = m.replyInput[:len(m.replyInput)-1]
+		}
+		if m.showInviteInput && len(m.inviteInput) > 0 {
+			m.inviteInput = m.inviteInput[:len(m.inviteInput)-1]
+		}
+		if m.showFollowInput && len(m.followInput) > 0 {
+			m.followInput = m.followInput[:len(m.followInput)-1]
+		}
+		if m.showSearchInput && len(m.searchQuery) > 0 {
+			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+		}
+		if m.showSettings && len(m.settingsInput) > 0 {
+			m.settingsInput = m.settingsInput[:len(m.settingsInput)-1]
+		}
+		return nil
+
+	case tea.KeyTab:
+		// Switch search filter type
+		if m.showSearchInput {
+			types := []string{"text", "hashtag", "author"}
+			for i, t := range types {
+				if t == m.searchFilterType {
+					m.searchFilterType = types[(i+1)%len(types)]
+					break
+				}
+			}
+		}
+		return nil
+
+	case tea.KeyRunes:
+		// Handle single-character settings commands
+		if len(msg.Runes) == 1 && m.showSettings && m.settingsEditing == "" {
+			switch msg.Runes[0] {
+			case '1':
+				// Edit username setting
+				m.settingsEditing = "username"
+				m.settingsInput = m.settingsUsername
+				return nil
+			case '2':
+				// Toggle LAN discovery setting
+				m.settingsEditing = "lan"
+				m.settingsInput = map[bool]string{true: "y", false: "n"}[m.settingsLANDiscovery]
+				return nil
+			case '3':
+				// Regenerate PFP setting
+				return m.regeneratePFP()
+			}
+		}
+		// Fall through to typing
+		fallthrough
+
+	default:
+		// Typing
+		if m.editing && len(msg.Runes) > 0 {
+			m.composerText += string(msg.Runes)
+		}
+		if m.showReplyInput && len(msg.Runes) > 0 {
+			m.replyInput += string(msg.Runes)
+		}
+		if m.showInviteInput && len(msg.Runes) > 0 {
+			m.inviteInput += string(msg.Runes)
+		}
+		if m.showFollowInput && len(msg.Runes) > 0 {
+			m.followInput += string(msg.Runes)
+		}
+		if m.showSearchInput && len(msg.Runes) > 0 {
+			m.searchQuery += string(msg.Runes)
+		}
+		if m.showSettings && len(msg.Runes) > 0 && m.settingsEditing != "" {
+			m.settingsInput += string(msg.Runes)
+		}
+		return nil
+	}
+}
+
+// handleNavigationKeyMsg handles keyboard input for navigation.
+func (m *SoClModel) handleNavigationKeyMsg(msg tea.KeyMsg) tea.Cmd {
 	switch msg.Type {
 	case tea.KeyCtrlC, tea.KeyEsc:
 		return tea.Quit
@@ -492,176 +772,38 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		return nil
 
 	case tea.KeyEnter:
-		if m.showSettings && m.settingsEditing != "" {
-			// Save setting value
-			value := m.settingsInput
-			m.settingsInput = ""
-			m.settingsEditing = ""
-			switch m.settingsEditing {
-			case "username":
-				return m.updateUsername(value)
-			case "pfp":
-				return m.regeneratePFP()
-			case "lan":
-				enabled := value == "y" || value == "yes" || value == "1"
-				return m.toggleLANDiscovery(enabled)
-			}
-			return nil
-		} else if m.showSearchInput {
-			// Perform search
-			query := m.searchQuery
-			m.searchQuery = ""
-			m.showSearchInput = false
-			return m.performSearch(query)
-		} else if m.showInviteInput {
-			// Redeem invite
-			inviteCode := m.inviteInput
-			m.inviteInput = ""
-			m.showInviteInput = false
-			return m.redeemInvite(inviteCode)
-		} else if m.showFollowInput {
-			// Follow peer
-			feedRef := m.followInput
-			m.followInput = ""
-			m.showFollowInput = false
-			return m.followPeer(feedRef)
-		} else if m.showReplyInput {
-			// Publish reply
-			text := m.replyInput
-			root := m.replyingTo
-			branch := m.replyingTo
-			m.replyInput = ""
-			m.showReplyInput = false
-			m.replyingTo = ""
-			return m.replyPost(text, root, branch)
-		} else if m.editing && !m.publishing {
-			// Publish post
-			text := m.composerText
-			m.composerText = ""
-			m.editing = false
-			m.publishing = true
-
-			// Optimistic UI update: add post immediately
-			newPost := Post{
-				Ref:       "",
-				Author:    "You",
-				Text:      text,
-				Time:      len(m.posts),
-				pfp:       core.GeneratePFP("optimistic"),
-				Root:      "",
-				Branch:    "",
-				LikeCount: 0,
-			}
-			m.posts = append([]Post{newPost}, m.posts...)
-
-			// Trim to max posts in memory
-			if len(m.posts) > maxPostsInMemory {
-				m.posts = m.posts[:maxPostsInMemory]
-			}
-
-			m.cursor = 0
-
-			return m.publishPost(text)
-		} else if m.editing {
-			// Already publishing, ignore
-			return nil
-		} else {
-			// Start editing
+		// Start editing post
+		if !m.editing {
 			m.editing = true
 			return nil
 		}
+		return nil
 
 	case tea.KeyUp:
-		// Navigate up in feed
-		if m.cursor > 0 {
+		// Navigate up in navigation menu or feed
+		if m.navCursor > 0 {
+			m.navCursor--
+			// Update current page
+			pages := []Page{PageHome, PageDiscover, PagePeers, PageProfile, PageSettings}
+			m.currentPage = pages[m.navCursor]
+		} else if m.cursor > 0 {
 			m.cursor--
 		}
 		return nil
 
 	case tea.KeyDown:
-		// Navigate down in feed
-		if m.cursor < len(m.posts)-1 {
+		// Navigate down in navigation menu or feed
+		pages := []Page{PageHome, PageDiscover, PagePeers, PageProfile, PageSettings}
+		if m.navCursor < len(pages)-1 {
+			m.navCursor++
+			// Update current page
+			m.currentPage = pages[m.navCursor]
+		} else if m.cursor < len(m.posts)-1 {
 			m.cursor++
 		}
 		return nil
 
-	case tea.KeyBackspace:
-		// Delete last character
-		if m.editing && len(m.composerText) > 0 {
-			m.composerText = m.composerText[:len(m.composerText)-1]
-		}
-		if m.showReplyInput && len(m.replyInput) > 0 {
-			m.replyInput = m.replyInput[:len(m.replyInput)-1]
-		}
-		if m.showInviteInput && len(m.inviteInput) > 0 {
-			m.inviteInput = m.inviteInput[:len(m.inviteInput)-1]
-		}
-		if m.showFollowInput && len(m.followInput) > 0 {
-			m.followInput = m.followInput[:len(m.followInput)-1]
-		}
-		if m.showSearchInput && len(m.searchQuery) > 0 {
-			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
-		}
-		if m.showSettings && len(m.settingsInput) > 0 {
-			m.settingsInput = m.settingsInput[:len(m.settingsInput)-1]
-		}
-		return nil
-
-	case tea.KeyTab:
-		// Switch search filter type
-		if m.showSearchInput {
-			types := []string{"text", "hashtag", "author"}
-			for i, t := range types {
-				if t == m.searchFilterType {
-					m.searchFilterType = types[(i+1)%len(types)]
-					break
-				}
-			}
-		}
-		return nil
-
-	case tea.KeyRunes:
-		// Handle single-character settings commands
-		if len(msg.Runes) == 1 && m.showSettings && m.settingsEditing == "" {
-			switch msg.Runes[0] {
-			case '1':
-				// Edit username setting
-				m.settingsEditing = "username"
-				m.settingsInput = m.settingsUsername
-				return nil
-			case '2':
-				// Toggle LAN discovery setting
-				m.settingsEditing = "lan"
-				m.settingsInput = map[bool]string{true: "y", false: "n"}[m.settingsLANDiscovery]
-				return nil
-			case '3':
-				// Regenerate PFP setting
-				return m.regeneratePFP()
-			}
-		}
-		// Fall through to typing
-		fallthrough
-
 	default:
-		// Typing
-		if m.editing && len(msg.Runes) > 0 {
-			m.composerText += string(msg.Runes)
-		}
-		if m.showReplyInput && len(msg.Runes) > 0 {
-			m.replyInput += string(msg.Runes)
-		}
-		if m.showInviteInput && len(msg.Runes) > 0 {
-			m.inviteInput += string(msg.Runes)
-		}
-		if m.showFollowInput && len(msg.Runes) > 0 {
-			m.followInput += string(msg.Runes)
-		}
-		if m.showSearchInput && len(msg.Runes) > 0 {
-			m.searchQuery += string(msg.Runes)
-		}
-		if m.showSettings && len(msg.Runes) > 0 && m.settingsEditing != "" {
-			m.settingsInput += string(msg.Runes)
-		}
 		return nil
 	}
 }
@@ -839,91 +981,390 @@ func (m *SoClModel) reactToPost(postRef, expression string) tea.Cmd {
 	}
 }
 
-// View renders the TUI to the terminal.
-// It uses basic formatting (Lip Gloss to be added).
+// View renders the TUI to the terminal using Lip Gloss styling.
+// It renders a 3-column layout: NAV (20%), MAIN CONTENT (50%), SIDEBAR (30%).
 func (m *SoClModel) View() string {
 	if m.width == 0 {
 		return "Loading..."
 	}
 
-	// TODO: Implement full UI rendering with Lip Gloss
-	// This should render:
-	// 1. Header
-	// 2. Feed area
-	// 3. Composer area
-	// 4. Sidebar (peers, trending)
+	// Render header
+	header := m.renderHeader()
 
-	result := m.renderHeader()
-	result += "\n\n"
-	result += m.renderFeed()
-	result += "\n\n"
-	result += m.renderComposer()
+	// Render 3-column layout
+	navPanel := m.renderNavPanel()
+	mainPanel := m.renderMainPanel()
+	sidebarPanel := m.renderSidebarPanel()
 
-	if m.showReplyInput {
-		result += "\n\n" + m.renderReplyInput()
-	}
+	// Join panels horizontally
+	content := lipgloss.JoinHorizontal(
+		lipgloss.Top,
+		navPanel,
+		mainPanel,
+		sidebarPanel,
+	)
 
-	if m.showInviteInput {
-		result += "\n\n" + m.renderInviteInput()
-	}
+	// Render footer
+	footer := m.renderFooter()
 
-	if m.showFollowInput {
-		result += "\n\n" + m.renderFollowInput()
-	}
-
-	if m.showSearchInput {
-		result += "\n\n" + m.renderSearchInput()
-	}
-
-	if m.showPeers {
-		result += "\n\n" + m.renderSidebar()
-	}
-
-	if m.showTrending {
-		result += "\n\n" + m.renderTrending()
-	}
-
-	if m.showMentions {
-		result += "\n\n" + m.renderMentions()
-	}
-
-	if m.showFollowGraph {
-		result += "\n\n" + m.renderFollowGraph()
-	}
-
-	if m.showSearchResults {
-		result += "\n\n" + m.renderSearchResults()
-	}
-
-	if m.showProfile {
-		result += "\n\n" + m.renderProfile()
-	}
-
-	if m.showSettings {
-		result += "\n\n" + m.renderSettings()
-	}
-
-	result += "\n\n" + m.renderFooter()
-
-	return result
+	// Combine all parts
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		header,
+		content,
+		footer,
+	)
 }
 
-// renderHeader renders the header with notification indicator.
+// renderHeader renders the header with app name, version, and notification indicator.
 func (m *SoClModel) renderHeader() string {
-	header := "=== so_cl ===="
+	header := fmt.Sprintf("{＊} so_cl │ Social P2P Network %s", m.appVersion)
 	if m.unreadMentions > 0 {
 		header += fmt.Sprintf(" [%d new mentions]", m.unreadMentions)
 	}
-	return header
+	return headerStyle.Render(header)
 }
 
-// renderFooter renders the footer with key bindings.
-func (m *SoClModel) renderFooter() string {
-	footer := "F1: Peers | F2: Invite | F3: Follow | F4: Reply | F5: Like | F6: Trending | F7: Mentions | F8: Search | F9: Profile | F10: Settings | F11: Follow Graph"
-	if m.errorMsg != "" {
-		footer += fmt.Sprintf("\n%s", m.errorMsg)
+// renderNavPanel renders the left navigation panel.
+func (m *SoClModel) renderNavPanel() string {
+	pages := []Page{PageHome, PageDiscover, PagePeers, PageProfile, PageSettings}
+	var navItems []string
+
+	for i, page := range pages {
+		var item string
+		switch page {
+		case PageHome:
+			item = "[Home]"
+		case PageDiscover:
+			item = "[Discover]"
+		case PagePeers:
+			item = "[Peers]"
+		case PageProfile:
+			item = "[Profile]"
+		case PageSettings:
+			item = "[Settings]"
+		}
+
+		if i == m.navCursor {
+			navItems = append(navItems, navActiveStyle.Render(item))
+		} else {
+			navItems = append(navItems, navItemStyle.Render(item))
+		}
 	}
-	return footer
+
+	return navStyle.Render(lipgloss.JoinVertical(lipgloss.Left, navItems...))
+}
+
+// renderMainPanel renders the main content area based on current page.
+func (m *SoClModel) renderMainPanel() string {
+	var content string
+
+	switch m.currentPage {
+	case PageHome:
+		content = m.renderHomePage()
+	case PageDiscover:
+		content = m.renderDiscoverPage()
+	case PagePeers:
+		content = m.renderPeersPage()
+	case PageProfile:
+		content = m.renderProfilePage()
+	case PageSettings:
+		content = m.renderSettingsPage()
+	}
+
+	return mainStyle.Render(content)
+}
+
+// renderSidebarPanel renders the right sidebar with network status and ASCII art gallery.
+func (m *SoClModel) renderSidebarPanel() string {
+	var sections []string
+
+	// Network status section
+	networkSection := m.renderNetworkStatus()
+	sections = append(sections, networkSection)
+
+	// ASCII art gallery section
+	artGallery := m.renderArtGallery()
+	sections = append(sections, artGallery)
+
+	return sidebarStyle.Render(lipgloss.JoinVertical(lipgloss.Left, sections...))
+}
+
+// renderNetworkStatus renders the network status section.
+func (m *SoClModel) renderNetworkStatus() string {
+	var status strings.Builder
+	status.WriteString(sectionTitleStyle.Render("NETWORK STATUS"))
+	status.WriteString("\n\n")
+
+	// Connection status
+	connected := len(m.connectedPeers) > 0
+	connStatus := "Disconnected"
+	if connected {
+		connStatus = "Connected"
+	}
+	status.WriteString(fmt.Sprintf("Status: %s\n", connStatus))
+
+	// Peers count
+	status.WriteString(fmt.Sprintf("Peers: %d\n", len(m.connectedPeers)))
+
+	// Speed (placeholder for now)
+	speed := "0.0 NB/s"
+	if connected {
+		speed = "1.2 NB/s"
+	}
+	status.WriteString(fmt.Sprintf("Speed: %s\n", speed))
+
+	return status.String()
+}
+
+// renderArtGallery renders the ASCII art gallery section.
+func (m *SoClModel) renderArtGallery() string {
+	var gallery strings.Builder
+	gallery.WriteString(sectionTitleStyle.Render("ASCII ART GALLERY"))
+	gallery.WriteString("\n\n")
+
+	if len(m.posts) > 0 {
+		// Show up to 3 recent ASCII art previews
+		previewCount := 3
+		if len(m.posts) < previewCount {
+			previewCount = len(m.posts)
+		}
+
+		for i := 0; i < previewCount; i++ {
+			preview := m.posts[i].pfp
+			if preview != "" {
+				gallery.WriteString(preview)
+				gallery.WriteString("\n")
+			}
+		}
+	} else {
+		gallery.WriteString("No art yet\n")
+	}
+
+	return gallery.String()
+}
+
+// renderHomePage renders the home page with feed.
+func (m *SoClModel) renderHomePage() string {
+	var page strings.Builder
+	page.WriteString(sectionTitleStyle.Render("FEED"))
+	page.WriteString("\n\n")
+
+	if m.loading {
+		page.WriteString("Loading feed...")
+		return page.String()
+	}
+
+	if len(m.posts) == 0 {
+		page.WriteString("No posts yet. Press Enter to type a post.")
+		return page.String()
+	}
+
+	// Render posts
+	for i, post := range m.posts {
+		postStyle := postStyle
+		if i == m.cursor {
+			postStyle = selectedPostStyle
+		}
+
+		// Format post
+		postText := fmt.Sprintf("@%s: %s", post.Author, post.Text)
+		if post.LikeCount > 0 {
+			postText += fmt.Sprintf("\n<reply> <share> <like> %d", post.LikeCount)
+		} else {
+			postText += "\n<reply> <share> <like>"
+		}
+
+		postText += fmt.Sprintf("\n%d min ago", post.Time)
+
+		page.WriteString(postStyle.Render(postText))
+		page.WriteString("\n")
+	}
+
+	// Add composer at bottom
+	page.WriteString("\n")
+	page.WriteString(m.renderComposer())
+
+	return page.String()
+}
+
+// renderDiscoverPage renders the discover page with trending topics and popular posts.
+func (m *SoClModel) renderDiscoverPage() string {
+	var page strings.Builder
+	page.WriteString(sectionTitleStyle.Render("DISCOVER"))
+	page.WriteString("\n\n")
+
+	// Trending topics section
+	page.WriteString(sectionTitleStyle.Render("TRENDING TOPICS"))
+	page.WriteString("\n\n")
+
+	if len(m.trendingHashtags) > 0 {
+		for i, tag := range m.trendingHashtags {
+			indicator := "  "
+			if i == 0 {
+				indicator = "* " // Hot
+			} else if i == 1 {
+				indicator = "^ " // Rising
+			} else if i == 2 {
+				indicator = "+ " // Growing
+			}
+			page.WriteString(fmt.Sprintf("%s#%s %d\n", indicator, tag.Name, tag.Count))
+		}
+	} else {
+		page.WriteString("No trending topics yet\n")
+	}
+
+	// Popular posts section
+	page.WriteString("\n")
+	page.WriteString(sectionTitleStyle.Render("POPULAR POSTS"))
+	page.WriteString("\n\n")
+
+	if len(m.posts) > 0 {
+		// Show top post
+		topPost := m.posts[0]
+		page.WriteString(fmt.Sprintf("@%s: %s\n", topPost.Author, topPost.Text))
+		if topPost.LikeCount > 0 {
+			page.WriteString(fmt.Sprintf("<like> %d <share>\n", topPost.LikeCount))
+		}
+	} else {
+		page.WriteString("No popular posts yet\n")
+	}
+
+	// New peers to follow section
+	page.WriteString("\n")
+	page.WriteString(sectionTitleStyle.Render("NEW PEERS TO FOLLOW"))
+	page.WriteString("\n\n")
+
+	if len(m.followers) > 0 {
+		for i, follower := range m.followers {
+			if i < 3 {
+				page.WriteString(fmt.Sprintf("[@%s] • %d posts\n", truncateFeedRef(follower), 0))
+			}
+		}
+	} else {
+		page.WriteString("No new peers to follow\n")
+	}
+
+	return page.String()
+}
+
+// renderPeersPage renders the peers page with connected peers and statistics.
+func (m *SoClModel) renderPeersPage() string {
+	var page strings.Builder
+	page.WriteString(sectionTitleStyle.Render("PEERS"))
+	page.WriteString("\n\n")
+
+	// Connected peers section
+	page.WriteString(sectionTitleStyle.Render("CONNECTED PEERS"))
+	page.WriteString("\n\n")
+
+	if len(m.connectedPeers) > 0 {
+		for _, peer := range m.connectedPeers {
+			indicator := "● " // Active
+			if peer.State != "connected" {
+				indicator = "○ " // Offline
+			}
+			page.WriteString(fmt.Sprintf("%s%s\n", indicator, peer.Address))
+			page.WriteString(fmt.Sprintf("  %s\n", peer.State))
+			page.WriteString("  [Message] [Follow] [Info]\n")
+		}
+	} else {
+		page.WriteString("No connected peers\n")
+	}
+
+	// Peer statistics section
+	page.WriteString("\n")
+	page.WriteString(sectionTitleStyle.Render("PEER STATISTICS"))
+	page.WriteString("\n\n")
+
+	page.WriteString(fmt.Sprintf("Total Connections: %d\n", len(m.connectedPeers)))
+	page.WriteString(fmt.Sprintf("Active Sessions: %d\n", len(m.connectedPeers)))
+	page.WriteString("Data Transferred: 0 GB\n")
+	page.WriteString("Network Health: 100%\n")
+
+	return page.String()
+}
+
+// renderProfilePage renders the profile page with user info and statistics.
+func (m *SoClModel) renderProfilePage() string {
+	var page strings.Builder
+	page.WriteString(sectionTitleStyle.Render("PROFILE"))
+	page.WriteString("\n\n")
+
+	// Profile card
+	page.WriteString("╔═════════════════════╗\n")
+	page.WriteString(fmt.Sprintf("║  %s  ║\n", m.profile.PFP))
+	page.WriteString("╚═════════════════════╝\n")
+	page.WriteString(fmt.Sprintf("@%s\n", m.profile.Username))
+	if m.profile.Bio != "" {
+		page.WriteString(fmt.Sprintf("%s\n", m.profile.Bio))
+	}
+
+	// Statistics section
+	page.WriteString("\n")
+	page.WriteString(sectionTitleStyle.Render("PROFILE STATISTICS"))
+	page.WriteString("\n\n")
+
+	page.WriteString(fmt.Sprintf("Posts: %d    Following: %d\n", m.profile.PostCount, m.profile.FollowingCount))
+	page.WriteString(fmt.Sprintf("Followers: %d  Likes: 0\n", m.profile.FollowersCount))
+	page.WriteString("ASCII Arts: 0  Reposts: 0\n")
+
+	return page.String()
+}
+
+// renderSettingsPage renders the settings page.
+func (m *SoClModel) renderSettingsPage() string {
+	var page strings.Builder
+	page.WriteString(sectionTitleStyle.Render("SETTINGS"))
+	page.WriteString("\n\n")
+
+	page.WriteString(fmt.Sprintf("1. Username: %s\n", m.settingsUsername))
+	page.WriteString(fmt.Sprintf("2. LAN Discovery: %s\n", map[bool]string{true: "Enabled", false: "Disabled"}[m.settingsLANDiscovery]))
+	page.WriteString("3. Regenerate PFP\n")
+
+	if m.settingsEditing != "" {
+		page.WriteString(fmt.Sprintf("\nEditing: %s\n> %s\n", m.settingsEditing, m.settingsInput))
+		page.WriteString("Press Enter to save, Esc to cancel")
+	} else {
+		page.WriteString("\nPress 1-3 to edit")
+	}
+
+	return page.String()
+}
+
+// renderComposer renders the post input area.
+func (m *SoClModel) renderComposer() string {
+	prefix := "  "
+	if m.editing {
+		prefix = "> "
+	}
+
+	status := ""
+	if m.editing {
+		status = "(Editing)"
+	} else {
+		status = "Press Enter to start typing"
+	}
+
+	return fmt.Sprintf("%s%s (%d/280)\n%s",
+		prefix,
+		m.composerText,
+		len(m.composerText),
+		status,
+	)
+}
+
+// renderFooter renders the footer with key bindings and error messages.
+func (m *SoClModel) renderFooter() string {
+	var footer strings.Builder
+	footer.WriteString("↑/↓: Navigate | Enter: Edit | F1: Peers | F2: Invite | F3: Follow | F4: Reply | F5: Like | F6: Trending | F7: Mentions | F8: Search | F9: Profile | F10: Settings | F11: Follow Graph | Ctrl+C: Quit")
+
+	if m.errorMsg != "" {
+		footer.WriteString("\n")
+		footer.WriteString(buttonStyle.Render(m.errorMsg))
+	}
+
+	return footerStyle.Render(footer.String())
 }
 
 // renderFeed renders the social media feed.
@@ -963,27 +1404,6 @@ func (m *SoClModel) renderFeed() string {
 	return feed
 }
 
-// renderComposer renders the post input area.
-func (m *SoClModel) renderComposer() string {
-	prefix := "  "
-	if m.editing {
-		prefix = "> "
-	}
-
-	status := ""
-	if m.editing {
-		status = "(Editing)"
-	} else {
-		status = "Press Enter to start typing"
-	}
-
-	return fmt.Sprintf("=== Composer ===\n%s%s (%d/280)\n%s",
-		prefix,
-		m.composerText,
-		len(m.composerText),
-		status,
-	)
-}
 
 // renderSidebar renders the peer list sidebar.
 func (m *SoClModel) renderSidebar() string {
