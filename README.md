@@ -1,6 +1,6 @@
 # so_cl
 
-![alt text](s0_cl.png)
+![alt text](so_clls.jpeg)
 
 > **A decentralized social platform for your terminal**
 
