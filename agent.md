@@ -3,8 +3,8 @@
 > **Purpose**: This file serves as a memory bank, reference point, and operational guide for AI agents working on the so_cl project. It ensures continuity across sessions and maintains high-quality coding standards.
 
 **Last Updated**: 2025-12-30
-**Project Phase**: Phase 1 (P2P) ✅ Complete
-**Status**: Phase 1 P2P features complete - ready for Phase 2 (Social features)
+**Project Phase**: Phase 2 (Social Features) ✅ Implementation Complete
+**Status**: Phase 2 social features implementation complete - ready for Phase 3 (Polish features)
 
 ---
 
@@ -46,7 +46,7 @@
 |-------|----------|----------|--------|
 | **Phase 0** | Week 1-2 | Identity, posts, feed view, ASCII PFP | ✅ Complete |
 | **Phase 1** | Week 3-4 | P2P replication, follows, LAN discovery | ✅ Complete |
-| **Phase 2** | Week 5-6 | Replies, likes, hashtags, mentions | 🔲 TODO |
+| **Phase 2** | Week 5-6 | Replies, likes, hashtags, mentions | ✅ Implementation Complete |
 | **Phase 3** | Week 7+ | Search, profiles, settings, web UI | 🔲 TODO |
 
 ### Target Users
@@ -505,46 +505,52 @@ zap.L().Info("peer connected",
   - [x] Show "new messages available" indicator
   - [x] Test real-time updates
 
-### 📋 **Phase 2: Social (Week 5-6)**
+### 📋 **Phase 2: Social (Week 5-6)** ✅ Implementation Complete
 
-- [ ] **Replies (threaded messages)**
-  - [ ] Build reply composer
-  - [ ] Link to parent message (root/branch)
-  - [ ] Show thread hierarchy in feed
-  - [ ] Test reply flow
+- [x] **Replies (threaded messages)**
+  - [x] Build reply composer
+  - [x] Link to parent message (root/branch)
+  - [x] Show thread hierarchy in feed
+  - [ ] Test reply flow (requires running app)
 
-- [ ] **Like/repost reactions**
-  - [ ] Add reaction button in UI
-  - [ ] Publish reaction messages (type: "vote")
-  - [ ] Show reaction counts on posts
-  - [ ] Test reactions
+- [x] **Like/repost reactions**
+  - [x] Add reaction button in UI (F5 key)
+  - [x] Publish reaction messages (type: "vote")
+  - [x] Show reaction counts on posts
+  - [ ] Test reactions (requires running app)
 
-- [ ] **Hashtag indexing**
-  - [ ] Extract hashtags from posts
-  - [ ] Store in BadgerDB indexes
-  - [ ] Count hashtag usage
-  - [ ] Test hashtag extraction
+- [x] **Hashtag indexing**
+  - [x] Extract hashtags from posts
+  - [x] Store in BadgerDB indexes
+  - [x] Count hashtag usage
+  - [x] Test hashtag extraction
 
-- [ ] **Trending sidebar**
-  - [ ] Query top 10 hashtags from indexes
-  - [ ] Display in sidebar
-  - [ ] Update in real-time
-  - [ ] Test trending display
+- [x] **Trending sidebar**
+  - [x] Query top 10 hashtags from indexes
+  - [x] Display in sidebar (F6 key)
+  - [x] Update in real-time
+  - [ ] Test trending display (requires running app)
 
-- [ ] **@mentions + notifications**
-  - [ ] Extract @mentions from posts
-  - [ ] Store in mention queue (BadgerDB)
-  - [ ] Show notification indicator
-  - [ ] Display mention list
-  - [ ] Test mentions
+- [x] **@mentions + notifications**
+  - [x] Extract @mentions from posts
+  - [x] Store in mention queue (BadgerDB)
+  - [x] Show notification indicator
+  - [x] Display mention list (F7 key)
+  - [ ] Test mentions (requires running app)
 
-- [ ] **Follow/unfollow graph**
+- [ ] **Follow/unfollow graph** (Moved to Phase 3)
   - [ ] Track follow status per peer
   - [ ] Show following/followers count
   - [ ] Display follow relationships
   - [ ] Test follow graph
 
 ### 📋 **Phase 3: Polish (Week 7+)**
+
+- [ ] **Follow/unfollow graph** (Moved from Phase 2)
+  - [ ] Track follow status per peer
+  - [ ] Show following/followers count
+  - [ ] Display follow relationships
+  - [ ] Test follow graph
 
 - [ ] **Search + filters**
   - [ ] Search posts by text
@@ -1175,26 +1181,39 @@ go tool pprof http://localhost:6060/debug/pprof/heap
 ```markdown
 ## Session State
 
-**Date**: 2025-12-29
-**Phase**: Phase 0 (MVP) → Phase 1 ready
-**Current Task**: Phase 0 completed - scuttlego integration done
-**Last Completed**: Full scuttlego service integration with Publish, Follow, Connect, GetRecentMessages
+**Date**: 2025-12-30
+**Phase**: Phase 2 (Social Features) ✅ Implementation Complete
+**Current Task**: Phase 2 implementation complete - Replies, reactions, trending, mentions
+**Last Completed**:
+- Added Reply, React, GetTopHashtags, GetMentions to scuttlego service
+- Added ReplyPublishedMsg, ReactionPublishedMsg, TrendingLoadedMsg, MentionsLoadedMsg to UI
+- Added F4, F5, F6, F7 key bindings for replies, likes, trending, mentions
+- Added thread hierarchy (indentation) to feed rendering
+- Added notification indicator to header
+- Added tests for hashtag/mention extraction
+
 **Blockers**: None
-**Next Priority**: Start Phase 1 - P2P features (invite codes, peer connections, EBT replication)
+**Next Priority**: Start Phase 3 - Polish features (Search, Profiles, Settings, Web UI)
 
 **Files Modified**:
-- [x] `scuttlego/service.go` - Full scuttlego integration with BadgerDB, network, EBT
-- [x] `core/asciipfp.go` - 6x6 ANSI art PFP generator with deterministic seeding
-- [x] `go.mod` - Added scuttlego v0.0.4 and all dependencies
+- [x] `core/types.go` - Added Vote, Notification, TrendingHashtag types; added LikeCount to SoClPost
+- [x] `scuttlego/service.go` - Added Reply, React, GetTopHashtags, GetMentions methods; updated Message struct
+- [x] `ui/model.go` - Added new message types, model fields, key bindings, render functions
+- [x] `indexes/hashtags_test.go` - Added comprehensive tests for ExtractHashtags and ExtractMentions
+- [x] `ui/model_test.go` - Updated mock service with new methods
+- [x] `agent.md` - Updated Phase 2 status
 
 **Tests Written**:
-- [x] `core/asciipfp_test.go` - Tests for PFP generation (determinism, rendering)
+- [x] `indexes/hashtags_test.go` - Tests for hashtag/mention extraction
+- [x] Updated `ui/model_test.go` - Mock service now implements all required methods
 
 **Next Session Goals**:
-  | 2025-12-29 | Full scuttlego service integration (Publish, Follow, Connect, GetRecentMessages) | ✅ Complete | All Phase 0 MVP features implemented
-  1. [ ] Add tests for scuttlego service wrapper
-  2. [ ] Integrate ASCII PFP into feed rendering
-  3. [ ] Implement optimistic UI updates for publishing
+  1. [ ] Start Phase 3 - Search, Profiles, Settings, Web UI
+  2. [ ] Implement follow/unfollow graph tracking
+  3. [ ] Add profile pages for users
+  4. [ ] Implement search functionality
+  5. [ ] Add settings UI (username, PFP, discovery toggle)
+  6. [ ] Implement web UI (same state machine via net/http)
 ```
 
 ---

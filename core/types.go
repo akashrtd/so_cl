@@ -22,6 +22,8 @@ type SoClPost struct {
 	Tags []string
 	// Mentions are @mentions extracted from the post
 	Mentions []string
+	// LikeCount is the number of likes (votes) on this post
+	LikeCount int
 }
 
 // SoClPeer represents a connected SSB peer.
@@ -56,4 +58,42 @@ type SoClProfile struct {
 	FollowersCount int
 	// PostCount is the total number of posts by the user
 	PostCount int
+}
+
+// Vote represents a reaction (like) to a post.
+type Vote struct {
+	// Ref is the SSB message reference of the vote
+	Ref string
+	// Author is the SSB feed reference of the voter
+	Author string
+	// PostRef is the message reference being voted on
+	PostRef string
+	// Expression is the vote expression (e.g., "like", "❤️")
+	Expression string
+	// Timestamp is when the vote was created
+	Timestamp int64
+}
+
+// Notification represents a notification for the user.
+type Notification struct {
+	// Type is the notification type (mention, reply, follow, like)
+	Type string
+	// From is the feed reference of the user who triggered the notification
+	From string
+	// PostRef is the message reference (for mentions, replies, likes)
+	PostRef string
+	// Text is the notification text
+	Text string
+	// Timestamp is when the notification was created
+	Timestamp int64
+	// Read indicates if the notification has been read
+	Read bool
+}
+
+// TrendingHashtag represents a trending hashtag with its count.
+type TrendingHashtag struct {
+	// Name is the hashtag (without # prefix)
+	Name string
+	// Count is the number of times this hashtag was used
+	Count int
 }

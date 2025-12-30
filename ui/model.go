@@ -18,19 +18,27 @@ const maxPostsInMemory = 100
 
 type ScuttlegoService interface {
 	Publish(text string) (string, error)
+	Reply(text, root, branch string) (string, error)
+	React(postRef, expression string) (string, error)
 	GetRecentMessages(limit int) ([]scuttlego.Message, error)
 	Follow(feedRef string) error
 	Connect(address string) error
 	RedeemInvite(inviteCode string) error
 	GetPeers() ([]scuttlego.Peer, error)
 	GetEBTStatus() (bool, int, int)
+	GetTopHashtags(n int) ([]core.TrendingHashtag, error)
+	GetMentions(feedRef string) ([]string, error)
 }
 
 type Post struct {
-	Author string
-	Text   string
-	Time   int
-	pfp    string
+	Ref       string
+	Author    string
+	Text      string
+	Time      int
+	pfp       string
+	Root      string
+	Branch    string
+	LikeCount int
 }
 
 type FeedLoadedMsg struct {
@@ -40,6 +48,19 @@ type FeedLoadedMsg struct {
 type PostPublishedMsg struct {
 	Ref  string
 	Text string
+}
+
+type ReplyPublishedMsg struct {
+	Ref    string
+	Text   string
+	Root   string
+	Branch string
+}
+
+type ReactionPublishedMsg struct {
+	Ref        string
+	PostRef    string
+	Expression string
 }
 
 type NewMessageMsg struct {
@@ -52,6 +73,14 @@ type ErrorMsg struct {
 
 type PeersLoadedMsg struct {
 	Peers []scuttlego.Peer
+}
+
+type TrendingLoadedMsg struct {
+	Hashtags []core.TrendingHashtag
+}
+
+type MentionsLoadedMsg struct {
+	Mentions []string
 }
 
 type InviteRedeemedMsg struct {
@@ -94,6 +123,22 @@ type SoClModel struct {
 	connectedPeers []scuttlego.Peer
 	// showPeers shows if peer sidebar is visible
 	showPeers bool
+	// showTrending shows if trending sidebar is visible
+	showTrending bool
+	// showMentions shows if mentions list is visible
+	showMentions bool
+	// trendingHashtags is the list of trending hashtags
+	trendingHashtags []core.TrendingHashtag
+	// mentions is the list of mentions for the current user
+	mentions []string
+	// unreadMentions is the count of unread mentions
+	unreadMentions int
+	// replyInput shows if user is entering a reply
+	replyInput string
+	// showReplyInput shows if reply input is visible
+	showReplyInput bool
+	// replyingTo is the post ref being replied to
+	replyingTo string
 	// inviteInput shows if user is entering an invite code
 	inviteInput string
 	// showInviteInput shows if invite input is visible
@@ -107,23 +152,31 @@ type SoClModel struct {
 // NewSoClModel creates a new SoClModel with default state.
 func NewSoClModel(svc ScuttlegoService) *SoClModel {
 	return &SoClModel{
-		scuttlego:       svc,
-		posts:           []Post{},
-		composerText:    "",
-		peers:           []string{},
-		width:           0,
-		height:          0,
-		cursor:          0,
-		editing:         false,
-		loading:         false,
-		publishing:      false,
-		errorMsg:        "",
-		connectedPeers:  []scuttlego.Peer{},
-		showPeers:       false,
-		inviteInput:     "",
-		showInviteInput: false,
-		followInput:     "",
-		showFollowInput: false,
+		scuttlego:        svc,
+		posts:            []Post{},
+		composerText:     "",
+		peers:            []string{},
+		width:            0,
+		height:           0,
+		cursor:           0,
+		editing:          false,
+		loading:          false,
+		publishing:       false,
+		errorMsg:         "",
+		connectedPeers:   []scuttlego.Peer{},
+		showPeers:        false,
+		showTrending:     false,
+		showMentions:     false,
+		trendingHashtags: []core.TrendingHashtag{},
+		mentions:         []string{},
+		unreadMentions:   0,
+		replyInput:       "",
+		showReplyInput:   false,
+		replyingTo:       "",
+		inviteInput:      "",
+		showInviteInput:  false,
+		followInput:      "",
+		showFollowInput:  false,
 	}
 }
 
@@ -133,6 +186,8 @@ func (m *SoClModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.loadFeed(),
 		m.loadPeers(),
+		m.loadTrending(),
+		m.loadMentions(),
 	)
 }
 
@@ -170,14 +225,34 @@ func (m *SoClModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.followInput = ""
 		m.errorMsg = "Followed successfully"
 		return m, nil
+	case TrendingLoadedMsg:
+		m.trendingHashtags = msg.Hashtags
+		return m, nil
+	case MentionsLoadedMsg:
+		m.mentions = msg.Mentions
+		m.unreadMentions = len(msg.Mentions)
+		return m, nil
+	case ReplyPublishedMsg:
+		m.showReplyInput = false
+		m.replyInput = ""
+		m.replyingTo = ""
+		m.errorMsg = "Reply published successfully"
+		return m, m.loadFeed()
+	case ReactionPublishedMsg:
+		m.errorMsg = "Reaction published successfully"
+		return m, m.loadFeed()
 	case NewMessageMsg:
 		// New message received from EBT replication
 		// Add to feed with optimistic UI update
 		newPost := Post{
-			Author: msg.Post.Author,
-			Text:   msg.Post.Text,
-			Time:   len(m.posts),
-			pfp:    core.GeneratePFP(msg.Post.Author),
+			Ref:       msg.Post.Ref,
+			Author:    msg.Post.Author,
+			Text:      msg.Post.Text,
+			Time:      len(m.posts),
+			pfp:       core.GeneratePFP(msg.Post.Author),
+			Root:      msg.Post.Root,
+			Branch:    msg.Post.Branch,
+			LikeCount: msg.Post.LikeCount,
 		}
 		m.posts = append([]Post{newPost}, m.posts...)
 
@@ -222,6 +297,47 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		m.followInput = ""
 		return nil
 
+	case tea.KeyF4:
+		// Toggle reply input (reply to selected post)
+		if len(m.posts) > 0 && m.cursor < len(m.posts) {
+			m.showReplyInput = !m.showReplyInput
+			if m.showReplyInput {
+				m.replyingTo = m.posts[m.cursor].Ref
+				m.replyInput = ""
+			} else {
+				m.replyingTo = ""
+				m.replyInput = ""
+			}
+		}
+		return nil
+
+	case tea.KeyF5:
+		// Like the selected post
+		if len(m.posts) > 0 && m.cursor < len(m.posts) {
+			postRef := m.posts[m.cursor].Ref
+			if postRef != "" {
+				return m.reactToPost(postRef, "like")
+			}
+		}
+		return nil
+
+	case tea.KeyF6:
+		// Toggle trending sidebar
+		m.showTrending = !m.showTrending
+		if m.showTrending {
+			return m.loadTrending()
+		}
+		return nil
+
+	case tea.KeyF7:
+		// Toggle mentions list
+		m.showMentions = !m.showMentions
+		if m.showMentions {
+			m.unreadMentions = 0
+			return m.loadMentions()
+		}
+		return nil
+
 	case tea.KeyEnter:
 		if m.showInviteInput {
 			// Redeem invite
@@ -235,6 +351,15 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 			m.followInput = ""
 			m.showFollowInput = false
 			return m.followPeer(feedRef)
+		} else if m.showReplyInput {
+			// Publish reply
+			text := m.replyInput
+			root := m.replyingTo
+			branch := m.replyingTo
+			m.replyInput = ""
+			m.showReplyInput = false
+			m.replyingTo = ""
+			return m.replyPost(text, root, branch)
 		} else if m.editing && !m.publishing {
 			// Publish post
 			text := m.composerText
@@ -244,10 +369,14 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 
 			// Optimistic UI update: add post immediately
 			newPost := Post{
-				Author: "You",
-				Text:   text,
-				Time:   len(m.posts),
-				pfp:    core.GeneratePFP("optimistic"),
+				Ref:       "",
+				Author:    "You",
+				Text:      text,
+				Time:      len(m.posts),
+				pfp:       core.GeneratePFP("optimistic"),
+				Root:      "",
+				Branch:    "",
+				LikeCount: 0,
 			}
 			m.posts = append([]Post{newPost}, m.posts...)
 
@@ -287,6 +416,9 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		if m.editing && len(m.composerText) > 0 {
 			m.composerText = m.composerText[:len(m.composerText)-1]
 		}
+		if m.showReplyInput && len(m.replyInput) > 0 {
+			m.replyInput = m.replyInput[:len(m.replyInput)-1]
+		}
 		if m.showInviteInput && len(m.inviteInput) > 0 {
 			m.inviteInput = m.inviteInput[:len(m.inviteInput)-1]
 		}
@@ -299,6 +431,9 @@ func (m *SoClModel) handleKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		// Typing
 		if m.editing && len(msg.Runes) > 0 {
 			m.composerText += string(msg.Runes)
+		}
+		if m.showReplyInput && len(msg.Runes) > 0 {
+			m.replyInput += string(msg.Runes)
 		}
 		if m.showInviteInput && len(msg.Runes) > 0 {
 			m.inviteInput += string(msg.Runes)
@@ -320,10 +455,14 @@ func (m *SoClModel) loadFeed() tea.Cmd {
 		posts := make([]Post, len(messages))
 		for i, msg := range messages {
 			posts[i] = Post{
-				Author: msg.Author,
-				Text:   msg.Text,
-				Time:   msg.Time,
-				pfp:    core.GeneratePFP(msg.Author),
+				Ref:       msg.Ref,
+				Author:    msg.Author,
+				Text:      msg.Text,
+				Time:      msg.Time,
+				pfp:       core.GeneratePFP(msg.Author),
+				Root:      msg.Root,
+				Branch:    msg.Branch,
+				LikeCount: msg.LikeCount,
 			}
 		}
 
@@ -375,15 +514,57 @@ func (m *SoClModel) followPeer(feedRef string) tea.Cmd {
 	}
 }
 
+func (m *SoClModel) loadTrending() tea.Cmd {
+	return func() tea.Msg {
+		hashtags, err := m.scuttlego.GetTopHashtags(10)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		return TrendingLoadedMsg{Hashtags: hashtags}
+	}
+}
+
+func (m *SoClModel) loadMentions() tea.Cmd {
+	return func() tea.Msg {
+		// TODO: Get current user's feed ref from scuttlego service
+		// For now, use empty string to test
+		mentions, err := m.scuttlego.GetMentions("")
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		return MentionsLoadedMsg{Mentions: mentions}
+	}
+}
+
+func (m *SoClModel) replyPost(text, root, branch string) tea.Cmd {
+	return func() tea.Msg {
+		ref, err := m.scuttlego.Reply(text, root, branch)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		return ReplyPublishedMsg{Ref: ref, Text: text, Root: root, Branch: branch}
+	}
+}
+
+func (m *SoClModel) reactToPost(postRef, expression string) tea.Cmd {
+	return func() tea.Msg {
+		ref, err := m.scuttlego.React(postRef, expression)
+		if err != nil {
+			return ErrorMsg{Err: err}
+		}
+
+		return ReactionPublishedMsg{Ref: ref, PostRef: postRef, Expression: expression}
+	}
+}
+
 // View renders the TUI to the terminal.
 // It uses basic formatting (Lip Gloss to be added).
 func (m *SoClModel) View() string {
 	if m.width == 0 {
 		return "Loading..."
-	}
-
-	if m.errorMsg != "" {
-		return fmt.Sprintf("Error: %s\n\nPress Ctrl+C to exit", m.errorMsg)
 	}
 
 	// TODO: Implement full UI rendering with Lip Gloss
@@ -393,7 +574,15 @@ func (m *SoClModel) View() string {
 	// 3. Composer area
 	// 4. Sidebar (peers, trending)
 
-	result := m.renderFeed() + "\n\n" + m.renderComposer()
+	result := m.renderHeader()
+	result += "\n\n"
+	result += m.renderFeed()
+	result += "\n\n"
+	result += m.renderComposer()
+
+	if m.showReplyInput {
+		result += "\n\n" + m.renderReplyInput()
+	}
 
 	if m.showInviteInput {
 		result += "\n\n" + m.renderInviteInput()
@@ -407,9 +596,35 @@ func (m *SoClModel) View() string {
 		result += "\n\n" + m.renderSidebar()
 	}
 
-	result += "\n\nF1: Toggle Peers | F2: Invite | F3: Follow"
+	if m.showTrending {
+		result += "\n\n" + m.renderTrending()
+	}
+
+	if m.showMentions {
+		result += "\n\n" + m.renderMentions()
+	}
+
+	result += "\n\n" + m.renderFooter()
 
 	return result
+}
+
+// renderHeader renders the header with notification indicator.
+func (m *SoClModel) renderHeader() string {
+	header := "=== so_cl ===="
+	if m.unreadMentions > 0 {
+		header += fmt.Sprintf(" [%d new mentions]", m.unreadMentions)
+	}
+	return header
+}
+
+// renderFooter renders the footer with key bindings.
+func (m *SoClModel) renderFooter() string {
+	footer := "F1: Peers | F2: Invite | F3: Follow | F4: Reply | F5: Like | F6: Trending | F7: Mentions"
+	if m.errorMsg != "" {
+		footer += fmt.Sprintf("\n%s", m.errorMsg)
+	}
+	return footer
 }
 
 // renderFeed renders the social media feed.
@@ -430,9 +645,20 @@ func (m *SoClModel) renderFeed() string {
 		if i == m.cursor {
 			prefix = "> "
 		}
-		feed += fmt.Sprintf("%s%d. %s\n", prefix, i+1, post.Author)
-		feed += post.pfp
-		feed += fmt.Sprintf("%s\n\n", post.Text)
+
+		// Indent replies (thread hierarchy)
+		indent := ""
+		if post.Root != "" {
+			indent = "  "
+		}
+
+		feed += fmt.Sprintf("%s%s%d. %s", indent, prefix, i+1, post.Author)
+		if post.LikeCount > 0 {
+			feed += fmt.Sprintf(" [%d likes]", post.LikeCount)
+		}
+		feed += "\n"
+		feed += indent + post.pfp
+		feed += fmt.Sprintf("%s\n\n", indent+post.Text)
 	}
 
 	return feed
@@ -488,4 +714,44 @@ func (m *SoClModel) renderFollowInput() string {
 	return fmt.Sprintf("=== Follow Peer ===\n> %s\n\nPress Enter to follow, F3 to cancel",
 		m.followInput,
 	)
+}
+
+// renderReplyInput renders the reply input area.
+func (m *SoClModel) renderReplyInput() string {
+	return fmt.Sprintf("=== Reply ===\n> %s (%d/280)\n\nPress Enter to reply, F4 to cancel",
+		m.replyInput,
+		len(m.replyInput),
+	)
+}
+
+// renderTrending renders the trending hashtags sidebar.
+func (m *SoClModel) renderTrending() string {
+	if len(m.trendingHashtags) == 0 {
+		return "=== Trending ===\n\nNo trending hashtags"
+	}
+
+	var sidebar string
+	sidebar += "=== Trending ===\n\n"
+
+	for i, tag := range m.trendingHashtags {
+		sidebar += fmt.Sprintf("  %d. #%s (%d)\n", i+1, tag.Name, tag.Count)
+	}
+
+	return sidebar
+}
+
+// renderMentions renders the mentions list.
+func (m *SoClModel) renderMentions() string {
+	if len(m.mentions) == 0 {
+		return "=== Mentions ===\n\nNo mentions"
+	}
+
+	var list string
+	list += "=== Mentions ===\n\n"
+
+	for i, mention := range m.mentions {
+		list += fmt.Sprintf("  %d. %s\n", i+1, mention)
+	}
+
+	return list
 }

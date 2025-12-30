@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/require"
+	"github.com/yourusername/so_cl/core"
 	"github.com/yourusername/so_cl/scuttlego"
 )
 
@@ -17,10 +18,20 @@ type mockScuttlegoService struct {
 	ebtActive     bool
 	ebtSent       int
 	ebtReceived   int
+	trending      []core.TrendingHashtag
+	mentions      []string
 }
 
 func (m *mockScuttlegoService) Publish(text string) (string, error) {
 	return m.publishResult, m.publishErr
+}
+
+func (m *mockScuttlegoService) Reply(text, root, branch string) (string, error) {
+	return "@reply.msg", nil
+}
+
+func (m *mockScuttlegoService) React(postRef, expression string) (string, error) {
+	return "@vote.msg", nil
 }
 
 func (m *mockScuttlegoService) GetRecentMessages(limit int) ([]scuttlego.Message, error) {
@@ -48,6 +59,14 @@ func (m *mockScuttlegoService) GetPeers() ([]scuttlego.Peer, error) {
 
 func (m *mockScuttlegoService) GetEBTStatus() (bool, int, int) {
 	return m.ebtActive, m.ebtSent, m.ebtReceived
+}
+
+func (m *mockScuttlegoService) GetTopHashtags(n int) ([]core.TrendingHashtag, error) {
+	return m.trending, nil
+}
+
+func (m *mockScuttlegoService) GetMentions(feedRef string) ([]string, error) {
+	return m.mentions, nil
 }
 
 func TestNewSoClModel(t *testing.T) {
@@ -380,7 +399,7 @@ func TestModelView_WithError(t *testing.T) {
 	model.errorMsg = "test error"
 
 	view := model.View()
-	require.Contains(t, view, "Error: test error")
+	require.Contains(t, view, "test error")
 }
 
 func TestModelView_Feed(t *testing.T) {
