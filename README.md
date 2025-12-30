@@ -2,123 +2,120 @@
 
 ![alt text](so_clls.jpeg)
 
-> **A decentralized social platform for your terminal**
+> A decentralized social platform for your terminal
 
-<div align="center">
-
-so_cl (pronounced "social") is a peer-to-peer (P2P) social platform running entirely in the terminal using the [Secure Scuttlebutt](https://scuttlebutt.nz/) (SSB) protocol.
+so_cl (pronounced "social") is a peer-to-peer social platform that runs entirely in your terminal using the Secure Scuttlebutt (SSB) protocol.
 
 [![Version](https://img.shields.io/badge/version-0.1.5-blue)](https://github.com/yourusername/so_cl/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/so_cl)](https://goreportcard.com/report/github.com/yourusername/so_cl)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://go.dev/dl/)
 
-</div>
+---
+
+## Table of Contents
+
+- [About](#about)
+- [Features](#features)
+- [Technology Stack](#technology-stack)
+- [Getting Started](#getting-started)
+- [Development](#development)
+- [Contributing](#contributing)
+- [Testing](#testing)
+- [Architecture](#architecture)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
 
 ---
 
-## 📋 **Table of Contents**
+## About
 
-- [About](#-about)
-- [Features](#-features)
-- [Technology Stack](#-technology-stack)
-- [Getting Started](#-getting-started)
-- [Development](#-development)
-- [Contributing](#-contributing)
-- [Testing](#-testing)
-- [Architecture](#-architecture)
-- [License](#-license)
-- [Acknowledgments](#-acknowledgments)
+so_cl is a terminal-based social network that prioritizes:
 
----
-
-## 🌟 **About**
-
-**so_cl** is a terminal-based social network that prioritizes:
-
-- **🔒 Privacy**: All data stored locally, encrypted connections
-- **🌐 Decentralization**: No central servers, P2P communication
-- **💻 Simplicity**: Pure text/ASCII, minimal resource usage
-- **📱 Offline-First**: Create and read posts without internet
-- **🎨 Creativity**: ASCII art profile pictures (6x6 colored ANSI)
+- **Privacy**: All data stored locally with encrypted connections
+- **Decentralization**: No central servers, peer-to-peer communication
+- **Simplicity**: Pure text/ASCII interface with minimal resource usage
+- **Offline-First**: Create and read posts without an internet connection
+- **Creativity**: ASCII art profile pictures (6x6 colored ANSI)
 
 ### Why so_cl?
 
-- Perfect for developers who love terminal tools
-- Great for privacy advocates and offline-first enthusiasts
-- Built on Secure Scuttlebutt (battle-tested P2P protocol)
+- Designed for developers who love terminal tools
+- Ideal for privacy advocates and offline-first enthusiasts
+- Built on Secure Scuttlebutt, a battle-tested P2P protocol
 - Works entirely offline when needed
 - No corporate surveillance, no ads, no algorithms
 
 ---
 
-## ✨ **Features**
+## Features
 
-### Current (Phase 0 - MVP) ✅ Complete
-- ✅ SSB identity generation (Ed25519 keypair)
-- ✅ Post creation (280 character limit)
-- ✅ ASCII art profile pictures (6x6 colored ANSI)
-- ✅ Local feed view with pagination (100 posts max)
-- ✅ Offline-first (works without internet)
-- ✅ Hashtag/mention indexing
-- ✅ Optimistic UI updates
-- ✅ Comprehensive test coverage
+### Phase 0: MVP (Complete)
+- SSB identity generation (Ed25519 keypair)
+- Post creation (280 character limit)
+- ASCII art profile pictures (6x6 colored ANSI)
+- Local feed view with pagination (100 posts max)
+- Offline-first (works without internet)
+- Hashtag/mention indexing
+- Optimistic UI updates
+- Comprehensive test coverage
 
-### Current (Phase 1 - P2P) ✅ Complete
-- ✅ Follow via invite codes (`ssb:feed/invite/...`)
-- ✅ EBT replication with peers
-- ✅ LAN discovery (UDP broadcast)
-- ✅ Peer list sidebar (F1 toggle)
-- ✅ Real-time feed sync
-- ✅ Keyboard shortcuts: F1 (peers), F2 (invite), F3 (follow)
+### Phase 1: P2P (Complete)
+- Follow via invite codes (`ssb:feed/invite/...`)
+- EBT replication with peers
+- LAN discovery (UDP broadcast)
+- Peer list sidebar (F1 toggle)
+- Real-time feed sync
+- Keyboard shortcuts: F1 (peers), F2 (invite), F3 (follow)
 
-### Current (Phase 2 - Social) ✅ Complete
-- ✅ Replies (threaded messages with root/branch references)
-- ✅ Like reactions (emoji-safe, vote type messages)
-- ✅ Hashtag indexing + trending sidebar (F6 key)
-- ✅ @mentions + notifications (F7 key)
-- ✅ Follow/unfollow graph (indexed in BadgerDB)
-- ✅ 5 TUI pages: Home, Discover, Peers, Profile, Settings
+### Phase 2: Social (Complete)
+- Replies (threaded messages with root/branch references)
+- Like reactions (vote type messages)
+- Hashtag indexing with trending sidebar (F6 key)
+- @mentions with notifications (F7 key)
+- Follow/unfollow graph (indexed in BadgerDB)
+- Five TUI pages: Home, Discover, Peers, Profile, Settings
 
-### Current (Phase 3 - Polish) 🔄 In Progress
-- ✅ Search + filters (text, hashtag, author) - F8 key
-- ✅ Profile pages (ASCII PFP, stats) - F9 key
-- ✅ Settings (username, LAN discovery, PFP) - F10 key
-- ⏳ Export/backup identity
-- ⏳ Web UI (same state machine as TUI)
+### Phase 3: Polish (In Progress)
+- Search with filters (text, hashtag, author) - F8 key
+- Profile pages (ASCII PFP, stats) - F9 key
+- Settings (username, LAN discovery, PFP) - F10 key
+- Export/backup identity (planned)
+- Web UI using same state machine as TUI (planned)
 
 ### TUI Pages
+
 - **Home**: Social feed with posts, replies, and reactions
-- **Discover**: Trending hashtags, popular posts, new peers to follow
-- **Peers**: Connected peers, network statistics
-- **Profile**: User profile card, post/followers/following counts
-- **Settings**: Username, LAN discovery, regenerate PFP
+- **Discover**: Trending hashtags, popular posts, and new peers to follow
+- **Peers**: Connected peers and network statistics
+- **Profile**: User profile card with post/follower/following counts
+- **Settings**: Username, LAN discovery, and PFP regeneration options
 
 ---
 
-## 🛠️ **Technology Stack**
+## Technology Stack
 
 | Component | Technology | Version |
 |-----------|-----------|---------|
-| **Language** | Go | 1.24+ |
-| **SSB Library** | scuttlego | v0.0.4 |
-| **Storage** | BadgerDB v3 | v3.2103.5 |
-| **Frontend** | Bubble Tea | v1.3.10 |
-| **Styling** | Lip Gloss | v1.1.0 |
-| **Logging** | Zap | v1.27.1 |
-| **Testing** | testify | v1.9.0 |
+| Language | Go | 1.24+ |
+| SSB Library | scuttlego | v0.0.4 |
+| Storage | BadgerDB v3 | v3.2103.5 |
+| Frontend | Bubble Tea | v1.3.10 |
+| Styling | Lip Gloss | v1.1.0 |
+| Logging | Zap | v1.27.1 |
+| Testing | testify | v1.9.0 |
 
 ### Key Dependencies
 
-- **scuttlego**: Go implementation of Secure Scuttlebutt protocol
+- **scuttlego**: Go implementation of the Secure Scuttlebutt protocol
 - **BadgerDB**: Fast, embeddable key-value store (LSM-tree)
 - **Bubble Tea**: Powerful TUI framework for Go
-- **Lip Gloss**: Style definitions for nice terminal layouts
+- **Lip Gloss**: Style definitions for terminal layouts
 - **Zap**: Blazing fast, structured, leveled logging
 
 ---
 
-## 🚀 **Getting Started**
+## Getting Started
 
 ### Prerequisites
 
@@ -142,7 +139,7 @@ go build -o so_cl
 ./so_cl
 ```
 
-#### From Release (Coming Soon)
+#### From Release
 
 ```bash
 # Download the latest release for your platform
@@ -165,10 +162,10 @@ go install github.com/yourusername/so_cl@latest
 
 When you first run `so_cl`, it will:
 
-1. **Generate an SSB identity** (Ed25519 keypair)
-2. **Create a data directory** (`~/.so_cl/` with subdirectories for SSB data and indexes)
-3. **Generate an ASCII profile picture** (6x6 colored ANSI, deterministic from feed ref)
-4. **Start the TUI** with empty feed and navigation menu
+1. Generate an SSB identity (Ed25519 keypair)
+2. Create a data directory (`~/.so_cl/` with subdirectories for SSB data and indexes)
+3. Generate an ASCII profile picture (6x6 colored ANSI, deterministic from feed ref)
+4. Start the TUI with an empty feed and navigation menu
 
 ### Basic Usage
 
@@ -177,24 +174,21 @@ When you first run `so_cl`, it will:
 ./so_cl
 
 # Keyboard shortcuts (TUI):
-# ↑/↓         - Navigate feed/menu
-# Enter       - Start typing/post
-# F1          - Toggle peer list sidebar
-# F2          - Toggle invite code input
-# F3          - Toggle follow peer input
-# F4          - Reply to selected post
-# F5          - Like selected post
-# F6          - Toggle trending sidebar
-# F7          - Toggle mentions list
-# F8          - Toggle search input
-# F9          - Toggle profile view
-# F10         - Toggle settings view
-# F11         - Toggle follow graph sidebar
-# Ctrl+C/Esc  - Quit
+# Arrow Up/Down  - Navigate feed/menu
+# Enter          - Start typing or post
+# F1             - Toggle peer list sidebar
+# F2             - Toggle invite code input
+# F3             - Toggle follow peer input
+# F4             - Reply to selected post
+# F5             - Like selected post
+# F6             - Toggle trending sidebar
+# F7             - Toggle mentions list
+# F8             - Toggle search input
+# F9             - Toggle profile view
+# F10            - Toggle settings view
+# F11            - Toggle follow graph sidebar
+# Ctrl+C / Esc   - Quit
 
-# CLI options:
-./so_cl --help
-./so_cl
 # Environment variables:
 #   SO_CL_DATA_DIR=~/.so_cl           # Custom data directory
 #   SO_CL_PORT=8008                   # Custom SSB port
@@ -204,7 +198,7 @@ When you first run `so_cl`, it will:
 
 ---
 
-## 💻 **Development**
+## Development
 
 ### Setup Development Environment
 
@@ -221,7 +215,7 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 go install github.com/goreleaser/goreleaser@latest
 
 # Verify installation
-go version      # Should be 1.23+
+go version
 golangci-lint version
 ```
 
@@ -275,7 +269,7 @@ go build -o so_cl
 CGO_ENABLED=0 go build -ldflags="-s -w" -o so_cl
 
 # Build for multiple platforms
-make build-all  # Requires Makefile
+make build-all
 
 # Or use goreleaser
 goreleaser build --snapshot --clean
@@ -316,17 +310,17 @@ staticcheck ./...
 
 ---
 
-## 🤝 **Contributing**
+## Contributing
 
-We welcome contributions from everyone! Whether you're fixing a bug, adding a feature, improving documentation, or reporting an issue, your help is valuable.
+We welcome contributions from everyone. Whether you're fixing a bug, adding a feature, improving documentation, or reporting an issue, your help is valuable.
 
 ### How to Contribute
 
 #### 1. Find an Issue
 
-- Look for [good first issue](https://github.com/yourusername/so_cl/labels/good%20first%20issue) labels
+- Look for "good first issue" labels
 - Check [open issues](https://github.com/yourusername/so_cl/issues)
-- Or create a new issue if you have an idea
+- Create a new issue if you have an idea
 
 #### 2. Fork and Clone
 
@@ -358,15 +352,6 @@ git checkout -b fix/your-bug-fix
 # - Run linter: golangci-lint run
 # - Build: CGO_ENABLED=0 go build
 # - Document your code (godoc comments)
-
-# Example workflow:
-# 1. Write test
-# 2. Run test (should fail)
-# 3. Implement feature
-# 4. Run test (should pass)
-# 5. Run all tests: go test -race ./...
-# 6. Run linter: golangci-lint run
-# 7. Commit changes
 ```
 
 #### 5. Commit Changes
@@ -383,15 +368,6 @@ git commit -m "feat: add hashtag trending sidebar
 - Display top 10 in sidebar
 
 Fixes #123"
-
-# Commit message format:
-# feat: new feature
-# fix: bug fix
-# docs: documentation changes
-# style: formatting, missing semi colons, etc.
-# refactor: refactoring production code
-# test: adding missing tests
-# chore: updating build tasks, etc.
 ```
 
 #### 6. Push and Create Pull Request
@@ -417,7 +393,7 @@ git push origin feature/your-feature-name
 
 #### Testing
 
-- **Test Coverage**: Maintain ≥85% (95%+ for critical paths)
+- **Test Coverage**: Maintain 85%+ (95%+ for critical paths)
 - **Race Detection**: Always run `go test -race ./...`
 - **TDD**: Write tests before implementation
 - **Test Types**:
@@ -429,41 +405,30 @@ git push origin feature/your-feature-name
 
 | Package | Test Files | Tests |
 |---------|-----------|-------|
-| `scuttlego/` | 1 | 20+ |
-| `core/` | 4 | 10+ |
-| `ui/` | 1 | 20+ |
-| `indexes/` | 2 | 15+ |
-| `config/` | 1 | 5+ |
-| **Total** | **9** | **70+** |
+| scuttlego/ | 1 | 20+ |
+| core/ | 4 | 10+ |
+| ui/ | 1 | 20+ |
+| indexes/ | 2 | 15+ |
+| config/ | 1 | 5+ |
+| Total | 9 | 70+ |
 
 #### Documentation
 
 - Add godoc comments for all exported functions
-- Update `README.md` for user-facing changes
-- Update `agent.md` for AI agent context
-- Update `production.md` for spec changes
+- Update README.md for user-facing changes
+- Update agent.md for AI agent context
+- Update production.md for spec changes
 
-#### Precautions
+#### Important Notes
 
-- 🚫 **NEVER** skip tests
-- 🚫 **NEVER** modify scuttlego internals (use adapters)
-- 🚫 **NEVER** hardcode secrets
-- 🚫 **NEVER** implement custom crypto (use scuttlego's go-secretstream)
-
-### Contributing to AI Agent Guide
-
-Since `agent.md` is used by AI agents, please:
-
-- Update TODO list when completing tasks
-- Update Session State after work
-- Document new patterns in "Common Tasks"
-- Add debugging guides for new issues
-
-See [agent.md](agent.md) for details.
+- Never skip tests
+- Never modify scuttlego internals (use adapters)
+- Never hardcode secrets
+- Never implement custom crypto (use scuttlego's go-secretstream)
 
 ---
 
-## 🧪 **Testing**
+## Testing
 
 ### Running Tests
 
@@ -471,7 +436,7 @@ See [agent.md](agent.md) for details.
 # All tests
 go test ./...
 
-# With race detector (ALWAYS use this)
+# With race detector (always use this)
 go test -race ./...
 
 # With coverage
@@ -510,21 +475,21 @@ config/
 
 | Module | Test Files | Key Test Coverage |
 |--------|------------|------------------|
-| `scuttlego/` | 1 | publish, follow, connect, messages |
-| `core/` | 4 | identity, message, types, ascii pfp |
-| `ui/` | 1 | model updates, page rendering, keyboard |
-| `indexes/` | 2 | hashtags, follows, search |
-| `config/` | 1 | env vars, defaults |
+| scuttlego/ | 1 | publish, follow, connect, messages |
+| core/ | 4 | identity, message, types, ascii pfp |
+| ui/ | 1 | model updates, page rendering, keyboard |
+| indexes/ | 2 | hashtags, follows, search |
+| config/ | 1 | env vars, defaults |
 
 ### Coverage Goals
 
 | Target | Goal |
 |--------|-------|
-| Unit tests (70%) | ✅ All critical paths |
-| Integration tests (20%) | ✅ scuttlego service tests |
-| E2E tests (10%) | 📝 TODO |
-| Overall 85% | 📝 In progress |
-| Critical paths 95% | 📝 In progress |
+| Unit tests (70%) | All critical paths |
+| Integration tests (20%) | scuttlego service tests |
+| E2E tests (10%) | Planned |
+| Overall 85% | In progress |
+| Critical paths 95% | In progress |
 
 ### Example Test
 
@@ -553,34 +518,34 @@ func TestModelUpdate_PublishPost(t *testing.T) {
 
 ---
 
-## 🏗️ **Architecture**
+## Architecture
 
 ### System Layers
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│  Bubble Tea TUI (ui/model.go)                           │  User interface
-│  - 5 pages: Home, Discover, Peers, Profile, Settings      │  - State machine
-│  - Keyboard navigation (F1-F11, ↑/↓, Enter)            │  - Optimistic UI
-├────────────────────────────────────────────────────────────────┤
-│  scuttlego Service Layer (scuttlego/service.go)          │  Protocol wrapper
-│  - Publish, Reply, React (vote)                          │  - SSB operations
-│  - Follow, Unfollow                                     │  - P2P networking
-│  - Connect, RedeemInvite                                │  - LAN discovery
-├────────────────────────────────────────────────────────────────┤
-│  BadgerDB v3 Storage                                    │  Persistence
-│  ├── SSB data (messages, feed, contacts)                │  - scuttlego managed
-│  └── so_cl indexes                                      │  - Custom indexes
-│      ├── Hashtags (counting)                            │  - hashtags.go
-│      ├── Mentions (notification queue)                     │  - hashtags.go
-│      ├── Follow graph (following/followers)              │  - follows.go
-│      └── Full-text search                               │  - hashtags.go
-├────────────────────────────────────────────────────────────────┤
-│  scuttlego (SSB Protocol)                              │  Core protocol
-│  - Ed25519 identity                                    │  - Cryptography
-│  - EBT replication                                     │  - P2P sync
-│  - go-secretstream (encryption)                          │  - Security
-└────────────────────────────────────────────────────────────────┘
+---------------------------------------------------------------------------
+  Bubble Tea TUI (ui/model.go)                              User interface
+  - 5 pages: Home, Discover, Peers, Profile, Settings      State machine
+  - Keyboard navigation (F1-F11, arrows, Enter)              Optimistic UI
+---------------------------------------------------------------------------
+  scuttlego Service Layer (scuttlego/service.go)            Protocol wrapper
+  - Publish, Reply, React (vote)                           SSB operations
+  - Follow, Unfollow                                      P2P networking
+  - Connect, RedeemInvite                                  LAN discovery
+---------------------------------------------------------------------------
+  BadgerDB v3 Storage                                        Persistence
+  ├── SSB data (messages, feed, contacts)                 scuttlego managed
+  └── so_cl indexes                                        Custom indexes
+       ├── Hashtags (counting)                              hashtags.go
+       ├── Mentions (notification queue)                     hashtags.go
+       ├── Follow graph (following/followers)               follows.go
+       └── Full-text search                                hashtags.go
+---------------------------------------------------------------------------
+  scuttlego (SSB Protocol)                                  Core protocol
+  - Ed25519 identity                                     Cryptography
+  - EBT replication                                      P2P sync
+  - go-secretstream (encryption)                          Security
+---------------------------------------------------------------------------
 ```
 
 ### Key Concepts
@@ -592,53 +557,53 @@ func TestModelUpdate_PublishPost(t *testing.T) {
 
 ### Documentation
 
-- **[README.md](README.md)** - This file (user guide)
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
-- **[agent.md](agent.md)** - AI agent reference guide
-- **[production.md](production.md)** - Complete product specification
+- **README.md**: This file (user guide)
+- **CONTRIBUTING.md**: Contribution guidelines
+- **agent.md**: AI agent reference guide
+- **production.md**: Complete product specification
 
 ---
 
-## 📜 **License**
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-### TL;DR
+### Summary
 
-- ✅ Free to use
-- ✅ Free to modify
-- ✅ Free to distribute
-- ✅ Free to use commercially
-- ⚠️ Must include license and copyright notice
-- ⚠️ Software provided "as is" without warranty
+- Free to use
+- Free to modify
+- Free to distribute
+- Free to use commercially
+- Must include license and copyright notice
+- Software provided "as is" without warranty
 
 ---
 
-## 🙏 **Acknowledgments
+## Acknowledgments
 
 ### Libraries
 
-- **[scuttlego](https://github.com/planetary-social/scuttlego)** - Go SSB implementation
-- **[Bubble Tea](https://github.com/charmbracelet/bubbletea)** - TUI framework
-- **[Lip Gloss](https://github.com/charmbracelet/lipgloss)** - Terminal styling
-- **[BadgerDB](https://github.com/dgraph-io/badger)** - Embeddable KV store
-- **[Zap](https://github.com/uber-go/zap)** - Structured logging
+- [scuttlego](https://github.com/planetary-social/scuttlego) - Go SSB implementation
+- [Bubble Tea](https://github.com/charmbracelet/bubbletea) - TUI framework
+- [Lip Gloss](https://github.com/charmbracelet/lipgloss) - Terminal styling
+- [BadgerDB](https://github.com/dgraph-io/badger) - Embeddable KV store
+- [Zap](https://github.com/uber-go/zap) - Structured logging
 
 ### Protocols
 
-- **[Secure Scuttlebutt](https://scuttlebutt.nz/)** - P2P social protocol
-- **[Epidemic Broadcast Trees (EBT)](https://github.com/dominictarr/epidemic-broadcast-trees)** - Replication algorithm
+- [Secure Scuttlebutt](https://scuttlebutt.nz/) - P2P social protocol
+- [Epidemic Broadcast Trees (EBT)](https://github.com/dominictarr/epidemic-broadcast-trees) - Replication algorithm
 
 ### Inspiration
 
-- **[Planetary](https://www.planetary.social/)** - SSB client (iOS/Android)
-- **[Patchwork](https://patchwork.foo/)** - SSB client (Electron)
-- **[Manyverse](https://manyver.se/)** - SSB client (Android)
-- **[ssb-server](https://github.com/ssbc/ssb-server)** - Original SSB implementation
+- [Planetary](https://www.planetary.social/) - SSB client (iOS/Android)
+- [Patchwork](https://patchwork.foo/) - SSB client (Electron)
+- [Manyverse](https://manyver.se/) - SSB client (Android)
+- [ssb-server](https://github.com/ssbc/ssb-server) - Original SSB implementation
 
 ---
 
-## 📞 **Support & Community**
+## Support & Community
 
 ### Getting Help
 
@@ -653,7 +618,7 @@ When reporting bugs, please include:
 
 1. **so_cl version**: `./so_cl --version`
 2. **Go version**: `go version`
-3. **OS**: `uname -a` (Linux/macOS) or OS version (Windows)
+3. **OS**: `uname -a` (Linux/macOS) or Windows version
 4. **Steps to reproduce**: What you did before the bug
 5. **Expected behavior**: What should have happened
 6. **Actual behavior**: What actually happened
@@ -661,58 +626,58 @@ When reporting bugs, please include:
 
 ### Feature Requests
 
-We welcome feature requests! When suggesting a feature:
+We welcome feature requests. When suggesting a feature:
 
-1. **Describe the problem**: What problem are you trying to solve?
-2. **Proposed solution**: How do you think it should work?
-3. **Alternatives**: Have you considered any alternatives?
-4. **Additional context**: Any other relevant information?
+1. Describe the problem: What problem are you trying to solve?
+2. Proposed solution: How do you think it should work?
+3. Alternatives: Have you considered any alternatives?
+4. Additional context: Any other relevant information?
 
 ---
 
-## 🗺️ **Roadmap**
+## Roadmap
 
-### Phase 0: MVP (Week 1-2) ✅ Complete
-- [x] Project structure
-- [x] Identity generation
-- [x] Post creation
-- [x] Feed view
-- [x] Static binary build
-- [x] Hashtag/mention indexing
-- [x] Comprehensive tests
-- [x] Release automation (goreleaser)
+### Phase 0: MVP (Complete)
+- Project structure
+- Identity generation
+- Post creation
+- Feed view
+- Static binary build
+- Hashtag/mention indexing
+- Comprehensive tests
+- Release automation (goreleaser)
 
-### Phase 1: P2P (Week 3-4) ✅ Complete
-- [x] Follow via invite codes
-- [x] Peer connections
-- [x] EBT replication
-- [x] LAN discovery (UDP broadcast)
-- [x] Real-time feed sync
+### Phase 1: P2P (Complete)
+- Follow via invite codes
+- Peer connections
+- EBT replication
+- LAN discovery (UDP broadcast)
+- Real-time feed sync
 
-### Phase 2: Social (Week 5-6) ✅ Complete
-- [x] Replies (threaded messages)
-- [x] Like/repost reactions
-- [x] Hashtag indexing
-- [x] Trending sidebar
-- [x] @mentions + notifications
-- [x] Follow/unfollow graph
+### Phase 2: Social (Complete)
+- Replies (threaded messages)
+- Like/repost reactions
+- Hashtag indexing
+- Trending sidebar
+- @mentions + notifications
+- Follow/unfollow graph
 
-### Phase 3: Polish (Week 7+) 🔄 In Progress
-- [x] Search + filters (text, hashtag, author)
-- [x] Profile pages (PFP, bio, stats)
-- [x] Settings (username, LAN discovery, PFP regeneration)
-- [x] 5 TUI pages: Home, Discover, Peers, Profile, Settings
-- [ ] Export/backup identity
-- [ ] Web UI (same state machine as TUI)
-- [ ] Docker support
-- [ ] End-to-end tests
+### Phase 3: Polish (In Progress)
+- Search + filters (text, hashtag, author)
+- Profile pages (PFP, bio, stats)
+- Settings (username, LAN discovery, PFP regeneration)
+- Five TUI pages: Home, Discover, Peers, Profile, Settings
+- Export/backup identity
+- Web UI (same state machine as TUI)
+- Docker support
+- End-to-end tests
 
 ---
 
 <div align="center">
 
-**Made with ❤️ for the terminal**
+Made for the terminal
 
-[⬆ Back to Top](#so_cl)
+[Back to Top](#so_cl)
 
 </div>
