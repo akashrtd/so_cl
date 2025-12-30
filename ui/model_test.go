@@ -323,6 +323,8 @@ func TestModelUpdate_KeyMsg_Down(t *testing.T) {
 		{Author: "c", Text: "post3", Time: 2},
 	}
 	model.cursor = 0
+	// Set navCursor to max so KeyDown moves the cursor, not navCursor
+	model.navCursor = 4 // PageHome, PageDiscover, PagePeers, PageProfile, PageSettings (5 pages, so max index is 4)
 
 	msg := tea.KeyMsg{
 		Type: tea.KeyDown,
@@ -443,8 +445,9 @@ func TestModelView(t *testing.T) {
 
 	view = model.View()
 
-	require.Contains(t, view, "Composer")
-	require.Contains(t, view, "Peers")
+	// View renders "FEED" (styled) not "Composer" as a literal string
+	require.Contains(t, view, "FEED")
+	require.Contains(t, view, "NETWORK STATUS")
 }
 
 func TestModelView_WithError(t *testing.T) {
@@ -472,7 +475,8 @@ func TestModelView_Feed(t *testing.T) {
 
 	view := model.View()
 
-	require.Contains(t, view, "Feed")
+	// View renders "FEED" (styled) not "Feed"
+	require.Contains(t, view, "FEED")
 	require.Contains(t, view, "@alice")
 	require.Contains(t, view, "@bob")
 	require.Contains(t, view, "hello world")

@@ -17,7 +17,7 @@ import (
 
 var (
 	// version is the current so_cl version
-	version = "0.0.1-dev"
+	version = "0.1.5"
 
 	// buildTime is when this binary was built
 	buildTime = "unknown"

@@ -1,4 +1,4 @@
-wpackage indexes
+package indexes
 
 // Package indexes provides follow graph tracking for so_cl.
 // It maintains custom indexes on top of BadgerDB for:

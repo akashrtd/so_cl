@@ -8,9 +8,10 @@
 
 so_cl (pronounced "social") is a peer-to-peer (P2P) social platform running entirely in the terminal using the [Secure Scuttlebutt](https://scuttlebutt.nz/) (SSB) protocol.
 
+[![Version](https://img.shields.io/badge/version-0.1.5-blue)](https://github.com/yourusername/so_cl/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Go Report Card](https://goreportcard.com/badge/github.com/yourusername/so_cl)](https://goreportcard.com/report/github.com/yourusername/so_cl)
-[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/dl/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://go.dev/dl/)
 
 </div>
 
@@ -72,18 +73,26 @@ so_cl (pronounced "social") is a peer-to-peer (P2P) social platform running enti
 - ✅ Keyboard shortcuts: F1 (peers), F2 (invite), F3 (follow)
 
 ### Current (Phase 2 - Social) ✅ Complete
-- ✅ Replies (threaded messages)
-- ✅ Like/repost reactions (emoji-safe)
+- ✅ Replies (threaded messages with root/branch references)
+- ✅ Like reactions (emoji-safe, vote type messages)
 - ✅ Hashtag indexing + trending sidebar (F6 key)
 - ✅ @mentions + notifications (F7 key)
-- ✅ Follow/unfollow graph
+- ✅ Follow/unfollow graph (indexed in BadgerDB)
+- ✅ 5 TUI pages: Home, Discover, Peers, Profile, Settings
 
 ### Current (Phase 3 - Polish) 🔄 In Progress
-- ✅ Search + filters (F8 key)
-- ✅ Profile pages (F9 key)
-- ✅ Settings (F10 key)
+- ✅ Search + filters (text, hashtag, author) - F8 key
+- ✅ Profile pages (ASCII PFP, stats) - F9 key
+- ✅ Settings (username, LAN discovery, PFP) - F10 key
 - ⏳ Export/backup identity
 - ⏳ Web UI (same state machine as TUI)
+
+### TUI Pages
+- **Home**: Social feed with posts, replies, and reactions
+- **Discover**: Trending hashtags, popular posts, new peers to follow
+- **Peers**: Connected peers, network statistics
+- **Profile**: User profile card, post/followers/following counts
+- **Settings**: Username, LAN discovery, regenerate PFP
 
 ---
 
@@ -91,12 +100,13 @@ so_cl (pronounced "social") is a peer-to-peer (P2P) social platform running enti
 
 | Component | Technology | Version |
 |-----------|-----------|---------|
-| **Language** | Go | 1.23+ |
+| **Language** | Go | 1.24+ |
 | **SSB Library** | scuttlego | v0.0.4 |
 | **Storage** | BadgerDB v3 | v3.2103.5 |
-| **Frontend** | Bubble Tea | v1.3.10+ |
-| **Styling** | Lip Gloss | v1.1.0+ |
-| **Logging** | Zap | v1.27.1+ |
+| **Frontend** | Bubble Tea | v1.3.10 |
+| **Styling** | Lip Gloss | v1.1.0 |
+| **Logging** | Zap | v1.27.1 |
+| **Testing** | testify | v1.9.0 |
 
 ### Key Dependencies
 
@@ -112,7 +122,7 @@ so_cl (pronounced "social") is a peer-to-peer (P2P) social platform running enti
 
 ### Prerequisites
 
-- **Go 1.23+**: [Install Go](https://go.dev/dl/)
+- **Go 1.24+**: [Install Go](https://go.dev/dl/)
 - **Git**: [Install Git](https://git-scm.com/downloads)
 - **Terminal**: Any terminal emulator (iTerm2, Alacritty, Terminal.app, etc.)
 
@@ -156,9 +166,9 @@ go install github.com/yourusername/so_cl@latest
 When you first run `so_cl`, it will:
 
 1. **Generate an SSB identity** (Ed25519 keypair)
-2. **Create a data directory** (`~/.so_cl/`)
-3. **Generate an ASCII profile picture** (random colors)
-4. **Show you the empty feed**
+2. **Create a data directory** (`~/.so_cl/` with subdirectories for SSB data and indexes)
+3. **Generate an ASCII profile picture** (6x6 colored ANSI, deterministic from feed ref)
+4. **Start the TUI** with empty feed and navigation menu
 
 ### Basic Usage
 
@@ -167,13 +177,12 @@ When you first run `so_cl`, it will:
 ./so_cl
 
 # Keyboard shortcuts (TUI):
-# j/k or ↑/↓  - Navigate feed
-# /           - Start typing a post
-# Enter       - Publish post
+# ↑/↓         - Navigate feed/menu
+# Enter       - Start typing/post
 # F1          - Toggle peer list sidebar
 # F2          - Toggle invite code input
 # F3          - Toggle follow peer input
-# F4          - Toggle reply input (reply to selected post)
+# F4          - Reply to selected post
 # F5          - Like selected post
 # F6          - Toggle trending sidebar
 # F7          - Toggle mentions list
@@ -181,13 +190,16 @@ When you first run `so_cl`, it will:
 # F9          - Toggle profile view
 # F10         - Toggle settings view
 # F11         - Toggle follow graph sidebar
-# q           - Quit
+# Ctrl+C/Esc  - Quit
 
 # CLI options:
 ./so_cl --help
-./so_cl --data-dir ~/.so_cl        # Custom data directory
-./so_cl --port 8008                # Custom SSB port
-./so_cl --debug                    # Enable debug logging
+./so_cl
+# Environment variables:
+#   SO_CL_DATA_DIR=~/.so_cl           # Custom data directory
+#   SO_CL_PORT=8008                   # Custom SSB port
+#   SO_CL_ENABLE_LAN_DISCOVERY=true   # Enable LAN discovery
+#   SO_CL_DEBUG=true                  # Enable debug logging
 ```
 
 ---
@@ -217,31 +229,40 @@ golangci-lint version
 
 ```
 so_cl/
-├── main.go                    # Entry point
+├── main.go                    # Entry point, init logger & Bubble Tea
 ├── go.mod                     # Go dependencies
-├── agent.md                   # AI agent reference guide
-├── production.md             # Full product specification
-├── README.md                 # This file
-├── .goreleaser.yml            # Release automation
+├── go.sum                     # Dependency checksums
+├── Makefile                   # Build automation
+├── .goreleaser.yml           # Release automation
 │
-├── ui/                       # Presentation layer
-│   ├── model.go              # Bubble Tea model
+├── ui/                       # Presentation layer (Bubble Tea TUI)
+│   ├── model.go              # TUI model & state machine
 │   └── model_test.go         # Model tests
 │
-├── core/                     # Domain models
-│   ├── asciipfp.go           # ASCII PFP generator
-│   └── asciipfp_test.go      # PFP tests
+├── core/                     # Domain models & utilities
+│   ├── identity.go           # SSB identity (Ed25519)
+│   ├── identity_test.go      # Identity tests
+│   ├── message.go           # Post/reply types
+│   ├── message_test.go      # Message tests
+│   ├── types.go             # Common types (SoClPost, SoClPeer, etc.)
+│   ├── types_test.go        # Type tests
+│   ├── asciipfp.go         # ASCII profile picture generator
+│   └── asciipfp_test.go    # PFP tests (determinism)
 │
-├── scuttlego/                # scuttlego wrapper
-│   ├── service.go            # Service lifecycle
+├── scuttlego/                # SSB protocol wrapper
+│   ├── service.go            # Service: publish, follow, connect, search
 │   └── service_test.go      # Integration tests
 │
-├── indexes/                  # Custom indexes
-│   ├── hashtags.go           # Hashtag/mention indexing & search
-│   └── follows.go           # Follow graph tracking
+├── indexes/                  # BadgerDB custom indexes
+│   ├── hashtags.go           # Hashtag counting, mentions, search
+│   ├── hashtags_test.go      # Index tests
+│   ├── follows.go           # Follow graph tracking
+│   ├── follows_test.go      # Follow relationship tests
+│   └── test_helpers.go      # Test utilities
 │
 └── config/                   # Configuration
-    └── config.go             # Config loader
+    ├── config.go             # Config loader (env vars)
+    └── config_test.go        # Config tests
 ```
 
 ### Building
@@ -404,13 +425,16 @@ git push origin feature/your-feature-name
   - Integration tests: 20% (real DB/scuttlego)
   - E2E tests: 10% (TUI mock)
 
-#### Current Coverage
+#### Test Coverage
 
-| Package | Tests | Coverage |
-|----------|--------|----------|
-| `scuttlego/` | 20+ | 95%+ |
-| `core/` | 3 | 100% |
-| `ui/` | 23 | 90%+ |
+| Package | Test Files | Tests |
+|---------|-----------|-------|
+| `scuttlego/` | 1 | 20+ |
+| `core/` | 4 | 10+ |
+| `ui/` | 1 | 20+ |
+| `indexes/` | 2 | 15+ |
+| `config/` | 1 | 5+ |
+| **Total** | **9** | **70+** |
 
 #### Documentation
 
@@ -462,33 +486,44 @@ go tool cover -html=coverage.out
 
 ```
 core/
-├── asciipfp_test.go       # ASCII PFP tests (determinism, rendering)
+├── identity_test.go       # SSB identity generation (Ed25519)
+├── asciipfp_test.go      # ASCII PFP tests (determinism, rendering)
+├── message_test.go       # Post/reply type tests
+└── types_test.go        # Common type tests
 
 scuttlego/
-└── service_test.go         # scuttlego service tests (publish, follow, connect, messages)
+└── service_test.go       # scuttlego service tests (publish, follow, connect, messages)
 
 ui/
-└── model_test.go           # Bubble Tea model tests (feed, publish, optimistic updates, pagination)
+└── model_test.go         # Bubble Tea model tests (feed, publish, optimistic UI, pages)
+
+indexes/
+├── hashtags_test.go      # Hashtag/mention indexing tests
+├── follows_test.go       # Follow graph tests
+└── test_helpers.go      # Test utilities (test DB setup)
+
+config/
+└── config_test.go       # Config loading tests (env vars, defaults)
 ```
 
-### Coverage Targets (Current)
+### Test Files
 
-| Module | Tests | Coverage |
-|--------|--------|----------|
-| `scuttlego/` | 20+ | 65%+ |
-| `core/` | 3 | 74% |
-| `ui/` | 23 | 78% |
-| `indexes/` | 0 | 0% (TODO) |
-| **Overall** | **46** | **54%** |
+| Module | Test Files | Key Test Coverage |
+|--------|------------|------------------|
+| `scuttlego/` | 1 | publish, follow, connect, messages |
+| `core/` | 4 | identity, message, types, ascii pfp |
+| `ui/` | 1 | model updates, page rendering, keyboard |
+| `indexes/` | 2 | hashtags, follows, search |
+| `config/` | 1 | env vars, defaults |
 
 ### Coverage Goals
 
-| Target | Status |
-|--------|--------|
-| Unit tests (70%) | ✅ 26+ tests |
-| Integration tests (20%) | ✅ 20+ tests |
+| Target | Goal |
+|--------|-------|
+| Unit tests (70%) | ✅ All critical paths |
+| Integration tests (20%) | ✅ scuttlego service tests |
 | E2E tests (10%) | 📝 TODO |
-| Overall 85% | 📝 In progress (54% current) |
+| Overall 85% | 📝 In progress |
 | Critical paths 95% | 📝 In progress |
 
 ### Example Test
@@ -523,19 +558,29 @@ func TestModelUpdate_PublishPost(t *testing.T) {
 ### System Layers
 
 ```
-┌─────────────────────────────────────────┐
-│  Bubble Tea TUI Event Loop               │  User interface
-├─────────────────────────────────────────┤
-│  so_cl Model (State Machine)             │  Application logic
-├─────────────────────────────────────────┤
-│  scuttlego Service Layer                │  Protocol + Orchestration
-├─────────────────────────────────────────┤
-│  BadgerDB v3 Storage                    │  Persistence
-│  - scuttlego internal (SSB data)        │
-│  - so_cl indexes (hashtags, mentions)    │
-├─────────────────────────────────────────┤
-│  scuttlego (includes go-secretstream)   │  Security
-└─────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│  Bubble Tea TUI (ui/model.go)                           │  User interface
+│  - 5 pages: Home, Discover, Peers, Profile, Settings      │  - State machine
+│  - Keyboard navigation (F1-F11, ↑/↓, Enter)            │  - Optimistic UI
+├────────────────────────────────────────────────────────────────┤
+│  scuttlego Service Layer (scuttlego/service.go)          │  Protocol wrapper
+│  - Publish, Reply, React (vote)                          │  - SSB operations
+│  - Follow, Unfollow                                     │  - P2P networking
+│  - Connect, RedeemInvite                                │  - LAN discovery
+├────────────────────────────────────────────────────────────────┤
+│  BadgerDB v3 Storage                                    │  Persistence
+│  ├── SSB data (messages, feed, contacts)                │  - scuttlego managed
+│  └── so_cl indexes                                      │  - Custom indexes
+│      ├── Hashtags (counting)                            │  - hashtags.go
+│      ├── Mentions (notification queue)                     │  - hashtags.go
+│      ├── Follow graph (following/followers)              │  - follows.go
+│      └── Full-text search                               │  - hashtags.go
+├────────────────────────────────────────────────────────────────┤
+│  scuttlego (SSB Protocol)                              │  Core protocol
+│  - Ed25519 identity                                    │  - Cryptography
+│  - EBT replication                                     │  - P2P sync
+│  - go-secretstream (encryption)                          │  - Security
+└────────────────────────────────────────────────────────────────┘
 ```
 
 ### Key Concepts
@@ -655,9 +700,12 @@ We welcome feature requests! When suggesting a feature:
 ### Phase 3: Polish (Week 7+) 🔄 In Progress
 - [x] Search + filters (text, hashtag, author)
 - [x] Profile pages (PFP, bio, stats)
-- [x] Settings (username, PFP, discovery)
+- [x] Settings (username, LAN discovery, PFP regeneration)
+- [x] 5 TUI pages: Home, Discover, Peers, Profile, Settings
 - [ ] Export/backup identity
-- [ ] Web UI
+- [ ] Web UI (same state machine as TUI)
+- [ ] Docker support
+- [ ] End-to-end tests
 
 ---
 
