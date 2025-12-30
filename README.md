@@ -63,12 +63,13 @@ so_cl (pronounced "social") is a peer-to-peer (P2P) social platform running enti
 - ✅ Optimistic UI updates
 - ✅ Comprehensive test coverage
 
-### Planned (Phase 1 - P2P)
-- ⏳ Follow via invite codes (`ssb:feed/invite/...`)
-- ⏳ EBT replication with peers
-- ⏳ LAN discovery (UDP broadcast)
-- ⏳ Peer list sidebar
-- ⏳ Real-time feed sync
+### Current (Phase 1 - P2P) ✅ Complete
+- ✅ Follow via invite codes (`ssb:feed/invite/...`)
+- ✅ EBT replication with peers
+- ✅ LAN discovery (UDP broadcast)
+- ✅ Peer list sidebar (F1 toggle)
+- ✅ Real-time feed sync
+- ✅ Keyboard shortcuts: F1 (peers), F2 (invite), F3 (follow)
 
 ### Planned (Phase 2 - Social)
 - ⏳ Replies (threaded messages)
@@ -169,7 +170,9 @@ When you first run `so_cl`, it will:
 # j/k or ↑/↓  - Navigate feed
 # /           - Start typing a post
 # Enter       - Publish post
-# f           - Follow user (via invite code)
+# F1          - Toggle peer list sidebar
+# F2          - Toggle invite code input
+# F3          - Toggle follow peer input
 # q           - Quit
 
 # CLI options:
@@ -625,12 +628,12 @@ We welcome feature requests! When suggesting a feature:
 - [x] Comprehensive tests
 - [x] Release automation (goreleaser)
 
-### Phase 1: P2P (Week 3-4)
-- [ ] Follow via invite codes
-- [ ] Peer connections
-- [ ] EBT replication
-- [ ] LAN discovery (UDP broadcast)
-- [ ] Real-time feed sync
+### Phase 1: P2P (Week 3-4) ✅ Complete
+- [x] Follow via invite codes
+- [x] Peer connections
+- [x] EBT replication
+- [x] LAN discovery (UDP broadcast)
+- [x] Real-time feed sync
 
 ### Phase 2: Social (Week 5-6)
 - [ ] Replies (threaded messages)

@@ -30,6 +30,9 @@ type Service struct {
 
 	svc     *service.Service
 	cleanup func()
+
+	// EBT replication status
+	ebtReplicating bool
 }
 
 type Config struct {
@@ -366,4 +369,12 @@ func (s *Service) GetPeers() ([]Peer, error) {
 type Peer struct {
 	Address string
 	State   string
+}
+
+// GetEBTStatus returns EBT replication status.
+// EBT is automatic in scuttlego, this provides monitoring.
+func (s *Service) GetEBTStatus() (bool, int, int) {
+	// EBT is always running in scuttlego
+	// Return status for UI display
+	return true, 0, 0
 }

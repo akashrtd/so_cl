@@ -14,6 +14,9 @@ type mockScuttlegoService struct {
 	publishErr    error
 	messages      []scuttlego.Message
 	peers         []scuttlego.Peer
+	ebtActive     bool
+	ebtSent       int
+	ebtReceived   int
 }
 
 func (m *mockScuttlegoService) Publish(text string) (string, error) {
@@ -41,6 +44,10 @@ func (m *mockScuttlegoService) RedeemInvite(inviteCode string) error {
 
 func (m *mockScuttlegoService) GetPeers() ([]scuttlego.Peer, error) {
 	return m.peers, nil
+}
+
+func (m *mockScuttlegoService) GetEBTStatus() (bool, int, int) {
+	return m.ebtActive, m.ebtSent, m.ebtReceived
 }
 
 func TestNewSoClModel(t *testing.T) {

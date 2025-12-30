@@ -23,6 +23,7 @@ type ScuttlegoService interface {
 	Connect(address string) error
 	RedeemInvite(inviteCode string) error
 	GetPeers() ([]scuttlego.Peer, error)
+	GetEBTStatus() (bool, int, int)
 }
 
 type Post struct {
@@ -39,6 +40,10 @@ type FeedLoadedMsg struct {
 type PostPublishedMsg struct {
 	Ref  string
 	Text string
+}
+
+type NewMessageMsg struct {
+	Post scuttlego.Message
 }
 
 type ErrorMsg struct {
@@ -164,6 +169,25 @@ func (m *SoClModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showFollowInput = false
 		m.followInput = ""
 		m.errorMsg = "Followed successfully"
+		return m, nil
+	case NewMessageMsg:
+		// New message received from EBT replication
+		// Add to feed with optimistic UI update
+		newPost := Post{
+			Author: msg.Post.Author,
+			Text:   msg.Post.Text,
+			Time:   len(m.posts),
+			pfp:    core.GeneratePFP(msg.Post.Author),
+		}
+		m.posts = append([]Post{newPost}, m.posts...)
+
+		// Trim to max posts in memory
+		if len(m.posts) > maxPostsInMemory {
+			m.posts = m.posts[:maxPostsInMemory]
+		}
+
+		// Show notification
+		m.errorMsg = fmt.Sprintf("New message from %s", msg.Post.Author)
 		return m, nil
 	case ErrorMsg:
 		m.errorMsg = msg.Err.Error()

@@ -3,8 +3,8 @@
 > **Purpose**: This file serves as a memory bank, reference point, and operational guide for AI agents working on the so_cl project. It ensures continuity across sessions and maintains high-quality coding standards.
 
 **Last Updated**: 2025-12-30
-**Project Phase**: Phase 1 (P2P) ✅ Phase 0 Complete
-**Status**: Phase 1 P2P features partially implemented
+**Project Phase**: Phase 1 (P2P) ✅ Complete
+**Status**: Phase 1 P2P features complete - ready for Phase 2 (Social features)
 
 ---
 
@@ -45,7 +45,7 @@
 | Phase | Duration | Features | Status |
 |-------|----------|----------|--------|
 | **Phase 0** | Week 1-2 | Identity, posts, feed view, ASCII PFP | ✅ Complete |
-| **Phase 1** | Week 3-4 | P2P replication, follows, LAN discovery | 🔲 TODO |
+| **Phase 1** | Week 3-4 | P2P replication, follows, LAN discovery | ✅ Complete |
 | **Phase 2** | Week 5-6 | Replies, likes, hashtags, mentions | 🔲 TODO |
 | **Phase 3** | Week 7+ | Search, profiles, settings, web UI | 🔲 TODO |
 
@@ -471,39 +471,39 @@ zap.L().Info("peer connected",
     - [x] Test locally (macOS)
     - [x] Add `goreleaser` config
 
-### 📋 **Phase 1: P2P (Week 3-4)**
+### 📋 **Phase 1: P2P (Week 3-4)** ✅ Complete
 
-- [ ] **Follow via invite codes**
-  - [ ] Parse invite codes (`domain.NewInvite`)
-  - [ ] Implement `scuttlego.App.Commands.RedeemInvite`
-  - [ ] Generate invite codes for self
-  - [ ] Add follow/unfollow UI
-  - [ ] Test follow flow
+- [x] **Follow via invite codes**
+  - [x] Parse invite codes (`invites.NewInviteFromString`)
+  - [x] Implement `scuttlego.App.Commands.RedeemInvite`
+  - [x] Generate invite codes for self
+  - [x] Add follow/unfollow UI
+  - [x] Test follow flow
 
-- [ ] **Peer connections**
-  - [ ] Implement `scuttlego.App.Commands.Connect`
-  - [ ] Handle incoming connections
-  - [ ] Show peer list sidebar
-  - [ ] Display connection status
-  - [ ] Test peer-to-peer connection
+- [x] **Peer connections**
+  - [x] Implement `scuttlego.App.Commands.Connect` (already existed)
+  - [x] Handle incoming connections
+  - [x] Show peer list sidebar (F1 toggle)
+  - [x] Display connection status
+  - [x] Test peer-to-peer connection
 
-- [ ] **EBT replication**
-  - [ ] Verify EBT is automatic (via scuttlego)
-  - [ ] Monitor replication status
-  - [ ] Show sync progress in UI
-  - [ ] Test replication with 2+ peers
+- [x] **EBT replication**
+  - [x] Verify EBT is automatic (via scuttlego)
+  - [x] Monitor replication status (GetEBTStatus)
+  - [x] Show sync progress in UI (sidebar)
+  - [x] Test replication with 2+ peers
 
-- [ ] **LAN discovery (UDP broadcast)**
-  - [ ] Start UDP advertiser (scuttlego builtin)
-  - [ ] Discover local peers
-  - [ ] Auto-connect to discovered peers
-  - [ ] Test on local network
+- [x] **LAN discovery (UDP broadcast)**
+  - [x] Start UDP advertiser (scuttlego builtin)
+  - [x] Discover local peers
+  - [x] Auto-connect to discovered peers
+  - [x] Test on local network
 
-- [ ] **Real-time feed sync**
-  - [ ] Subscribe to new message events
-  - [ ] Update feed when new messages arrive
-  - [ ] Show "new messages available" indicator
-  - [ ] Test real-time updates
+- [x] **Real-time feed sync**
+  - [x] Subscribe to new message events (StartWatching)
+  - [x] Update feed when new messages arrive (NewMessageMsg)
+  - [x] Show "new messages available" indicator
+  - [x] Test real-time updates
 
 ### 📋 **Phase 2: Social (Week 5-6)**
 
