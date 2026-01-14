@@ -9,7 +9,9 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/yourusername/so_cl/core"
@@ -120,6 +122,8 @@ type ScuttlegoService interface {
 	SearchPosts(query string) ([]string, error)
 	FilterByHashtag(hashtag string) ([]string, error)
 	FilterByAuthor(author string) ([]string, error)
+	GetNetworkStatus() (bool, float64, []scuttlego.Peer)
+	UpdateNetworkStatus()
 }
 
 type Post struct {
@@ -218,6 +222,11 @@ type LANDiscoveryToggledMsg struct {
 	Enabled bool
 }
 
+type NetworkStatusUpdatedMsg struct {
+	Connected bool
+	Speed     float64
+}
+
 // SoClModel is Bubble Tea model for so_cl.
 // It holds all application state:
 // - Posts (feed)
@@ -304,13 +313,13 @@ type SoClModel struct {
 	// settingsInput shows if user is entering a setting value
 	settingsInput string
 	// settingsEditing shows which setting is being edited
-	settingsEditing string
-	// currentPage is the currently active page
-	currentPage Page
-	// navCursor is the cursor position in the navigation menu
-	navCursor int
-	// appVersion is the application version
-	appVersion string
+	settingsEditing   string
+	currentPage       Page
+	navCursor         int
+	appVersion        string
+	internetConnected bool
+	networkSpeed      float64
+	viewport          viewport.Model
 }
 
 // NewSoClModel creates a new SoClModel with default state.
@@ -359,6 +368,9 @@ func NewSoClModel(svc ScuttlegoService) *SoClModel {
 		currentPage:          PageHome,
 		navCursor:            0,
 		appVersion:           "v0.1.5",
+		internetConnected:    false,
+		networkSpeed:         0,
+		viewport:             viewport.New(0, 0),
 	}
 }
 
@@ -371,6 +383,9 @@ func (m *SoClModel) Init() tea.Cmd {
 		m.loadTrending(),
 		m.loadMentions(),
 		m.loadFollowGraph(),
+		tea.Tick(time.Second*10, func(t time.Time) tea.Msg {
+			return t
+		}),
 	)
 }
 
@@ -386,11 +401,21 @@ func (m *SoClModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		headerHeight := 3
+		footerHeight := 3
+		mainHeight := m.height - headerHeight - footerHeight
+
+		navWidth := 20
+		sidebarWidth := 30
+		mainWidth := m.width - navWidth - sidebarWidth - 4
+
+		m.viewport = viewport.New(mainWidth, mainHeight)
 		return m, nil
 	case FeedLoadedMsg:
 		m.posts = msg.Posts
 		m.loading = false
 		m.publishing = false
+		m.updateViewportContent()
 		return m, nil
 	case PostPublishedMsg:
 		m.publishing = false
@@ -483,6 +508,18 @@ func (m *SoClModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.publishing = false
 		return m, nil
+	case NetworkStatusUpdatedMsg:
+		m.internetConnected = msg.Connected
+		m.networkSpeed = msg.Speed
+		return m, nil
+	case time.Time:
+		m.scuttlego.UpdateNetworkStatus()
+		connected, speed, _ := m.scuttlego.GetNetworkStatus()
+		m.internetConnected = connected
+		m.networkSpeed = speed
+		return m, tea.Tick(time.Second*10, func(t time.Time) tea.Msg {
+			return t
+		})
 	default:
 		return m, nil
 	}
@@ -783,11 +820,13 @@ func (m *SoClModel) handleNavigationKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		// Navigate up in navigation menu or feed
 		if m.navCursor > 0 {
 			m.navCursor--
-			// Update current page
 			pages := []Page{PageHome, PageDiscover, PagePeers, PageProfile, PageSettings}
 			m.currentPage = pages[m.navCursor]
-		} else if m.cursor > 0 {
-			m.cursor--
+		} else if m.currentPage == PageHome {
+			if m.cursor > 0 {
+				m.cursor--
+				m.viewport.LineUp(1)
+			}
 		}
 		return nil
 
@@ -796,10 +835,12 @@ func (m *SoClModel) handleNavigationKeyMsg(msg tea.KeyMsg) tea.Cmd {
 		pages := []Page{PageHome, PageDiscover, PagePeers, PageProfile, PageSettings}
 		if m.navCursor < len(pages)-1 {
 			m.navCursor++
-			// Update current page
 			m.currentPage = pages[m.navCursor]
-		} else if m.cursor < len(m.posts)-1 {
-			m.cursor++
+		} else if m.currentPage == PageHome {
+			if m.cursor < len(m.posts)-1 {
+				m.cursor++
+				m.viewport.LineDown(1)
+			}
 		}
 		return nil
 
@@ -1096,23 +1137,19 @@ func (m *SoClModel) renderNetworkStatus() string {
 	status.WriteString(sectionTitleStyle.Render("NETWORK STATUS"))
 	status.WriteString("\n\n")
 
-	// Connection status
-	connected := len(m.connectedPeers) > 0
 	connStatus := "Disconnected"
-	if connected {
+	if m.internetConnected {
 		connStatus = "Connected"
 	}
 	status.WriteString(fmt.Sprintf("Status: %s\n", connStatus))
 
-	// Peers count
 	status.WriteString(fmt.Sprintf("Peers: %d\n", len(m.connectedPeers)))
 
-	// Speed (placeholder for now)
-	speed := "0.0 NB/s"
-	if connected {
-		speed = "1.2 NB/s"
+	speedStr := "0.0 KB/s"
+	if m.networkSpeed > 0 {
+		speedStr = fmt.Sprintf("%.1f KB/s", m.networkSpeed)
 	}
-	status.WriteString(fmt.Sprintf("Speed: %s\n", speed))
+	status.WriteString(fmt.Sprintf("Speed: %s\n", speedStr))
 
 	return status.String()
 }
@@ -1144,30 +1181,18 @@ func (m *SoClModel) renderArtGallery() string {
 	return gallery.String()
 }
 
-// renderHomePage renders the home page with feed.
-func (m *SoClModel) renderHomePage() string {
-	var page strings.Builder
-	page.WriteString(sectionTitleStyle.Render("FEED"))
-	page.WriteString("\n\n")
-
-	if m.loading {
-		page.WriteString("Loading feed...")
-		return page.String()
+func (m *SoClModel) updateViewportContent() {
+	if len(m.posts) == 0 || m.viewport.Height == 0 {
+		return
 	}
 
-	if len(m.posts) == 0 {
-		page.WriteString("No posts yet. Press Enter to type a post.")
-		return page.String()
-	}
-
-	// Render posts
+	var feedContent strings.Builder
 	for i, post := range m.posts {
 		postStyle := postStyle
 		if i == m.cursor {
 			postStyle = selectedPostStyle
 		}
 
-		// Format post
 		postText := fmt.Sprintf("@%s: %s", post.Author, post.Text)
 		if post.LikeCount > 0 {
 			postText += fmt.Sprintf("\n<reply> <share> <like> %d", post.LikeCount)
@@ -1177,12 +1202,29 @@ func (m *SoClModel) renderHomePage() string {
 
 		postText += fmt.Sprintf("\n%d min ago", post.Time)
 
-		page.WriteString(postStyle.Render(postText))
-		page.WriteString("\n")
+		feedContent.WriteString(postStyle.Render(postText))
+		feedContent.WriteString("\n")
 	}
 
-	// Add composer at bottom
-	page.WriteString("\n")
+	m.viewport.SetContent(feedContent.String())
+}
+
+// renderHomePage renders the home page with feed.
+func (m *SoClModel) renderHomePage() string {
+	if m.loading {
+		return sectionTitleStyle.Render("FEED") + "\n\nLoading feed..."
+	}
+
+	if len(m.posts) == 0 {
+		return sectionTitleStyle.Render("FEED") + "\n\nNo posts yet. Press Enter to type a post."
+	}
+
+	// Build page content
+	var page strings.Builder
+	page.WriteString(sectionTitleStyle.Render("FEED"))
+	page.WriteString("\n\n")
+	page.WriteString(m.viewport.View())
+	page.WriteString("\n\n")
 	page.WriteString(m.renderComposer())
 
 	return page.String()
@@ -1403,7 +1445,6 @@ func (m *SoClModel) renderFeed() string {
 
 	return feed
 }
-
 
 // renderSidebar renders the peer list sidebar.
 func (m *SoClModel) renderSidebar() string {

@@ -78,6 +78,12 @@ func (m *mockScuttlegoService) GetEBTStatus() (bool, int, int) {
 	return m.ebtActive, m.ebtSent, m.ebtReceived
 }
 
+func (m *mockScuttlegoService) GetNetworkStatus() (bool, float64, []scuttlego.Peer) {
+	return true, 1024.0, m.peers
+}
+
+func (m *mockScuttlegoService) UpdateNetworkStatus() {}
+
 func (m *mockScuttlegoService) GetTopHashtags(n int) ([]core.TrendingHashtag, error) {
 	return m.trending, nil
 }
@@ -467,11 +473,18 @@ func TestModelView_Feed(t *testing.T) {
 	model := NewSoClModel(svc)
 	model.width = 80
 	model.height = 24
+
+	// Initialize viewport with WindowSizeMsg
+	_, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+
 	model.posts = []Post{
 		{Author: "@alice", Text: "hello world", Time: 0},
 		{Author: "@bob", Text: "test post", Time: 1},
 	}
 	model.cursor = 1
+
+	// Manually update viewport content since test bypasses message flow
+	model.updateViewportContent()
 
 	view := model.View()
 

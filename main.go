@@ -57,9 +57,11 @@ func main() {
 	// Start scuttlego service
 	go func() {
 		if err := scuttlegoService.Run(ctx); err != nil {
-			logger.Error("Scuttlego service error",
-				zap.Error(err),
-			)
+			if err != context.Canceled {
+				logger.Error("Scuttlego service error",
+					zap.Error(err),
+				)
+			}
 		}
 	}()
 

@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	badger "github.com/dgraph-io/badger/v3"
 	"github.com/planetary-social/scuttlego/service"
@@ -35,6 +37,12 @@ type Service struct {
 
 	// EBT replication status
 	ebtReplicating bool
+
+	// Network monitoring
+	lastInternetCheck time.Time
+	internetConnected bool
+	lastSpeedCheck    time.Time
+	networkSpeed      float64 // in KB/s
 }
 
 type Config struct {
@@ -92,14 +100,23 @@ func NewService(cfg Config, logger *zap.Logger) (*Service, error) {
 		}, nil
 	}
 
-	return &Service{
-		config:   cfg,
-		logger:   logger,
-		indexer:  indexes.NewIndexer(indexDB),
-		identity: &privateIdentity,
-		svc:      &svc,
-		cleanup:  cleanup,
-	}, nil
+	svcResult := &Service{
+		config:            cfg,
+		logger:            logger,
+		indexer:           indexes.NewIndexer(indexDB),
+		identity:          &privateIdentity,
+		svc:               &svc,
+		cleanup:           cleanup,
+		lastInternetCheck: time.Now(),
+		lastSpeedCheck:    time.Now(),
+		internetConnected: true,
+		networkSpeed:      0,
+	}
+
+	go svcResult.CheckInternetConnectivity()
+	go svcResult.MeasureNetworkSpeed()
+
+	return svcResult, nil
 }
 
 func (s *Service) Run(ctx context.Context) error {
@@ -725,4 +742,138 @@ func (s *Service) FilterByAuthor(author string) ([]string, error) {
 	}
 
 	return results, nil
+}
+
+// CheckInternetConnectivity checks if the system has internet access
+func (s *Service) CheckInternetConnectivity() bool {
+	s.logger.Debug("Checking internet connectivity")
+
+	timeout := 5 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := http.Client{
+		Timeout: timeout,
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, "https://www.google.com", nil)
+	if err != nil {
+		s.logger.Warn("Failed to create connectivity check request", zap.Error(err))
+		s.internetConnected = false
+		return false
+	}
+
+	req.Header.Set("User-Agent", "so_cl-connectivity-check")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		s.logger.Debug("Internet connectivity check failed", zap.Error(err))
+		s.internetConnected = false
+		return false
+	}
+	defer resp.Body.Close()
+
+	s.internetConnected = resp.StatusCode >= 200 && resp.StatusCode < 400
+	s.lastInternetCheck = time.Now()
+
+	s.logger.Debug("Internet connectivity check result",
+		zap.Bool("connected", s.internetConnected),
+	)
+
+	return s.internetConnected
+}
+
+// MeasureNetworkSpeed measures network download speed by performing a small HTTP download
+func (s *Service) MeasureNetworkSpeed() float64 {
+	s.logger.Debug("Measuring network speed")
+
+	timeout := 15 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	client := http.Client{
+		Timeout: timeout,
+	}
+
+	startTime := time.Now()
+
+	testURL := "http://speedtest.tele2.net/1MB.zip"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, testURL, nil)
+	if err != nil {
+		s.logger.Warn("Failed to create speed test request", zap.Error(err))
+		s.networkSpeed = 0
+		s.lastSpeedCheck = time.Now()
+		return 0
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		s.logger.Warn("Failed to measure network speed", zap.Error(err))
+		s.networkSpeed = 0
+		s.lastSpeedCheck = time.Now()
+		return 0
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		s.logger.Warn("Unexpected status code during speed test",
+			zap.Int("status_code", resp.StatusCode),
+		)
+		s.networkSpeed = 0
+		s.lastSpeedCheck = time.Now()
+		return 0
+	}
+
+	buffer := make([]byte, 4096)
+	var totalBytes int64
+
+	for {
+		n, err := resp.Body.Read(buffer)
+		if err != nil {
+			break
+		}
+		totalBytes += int64(n)
+	}
+
+	duration := time.Since(startTime).Seconds()
+	if duration > 0 {
+		s.networkSpeed = (float64(totalBytes) / 1024) / duration
+	} else {
+		s.networkSpeed = 0
+	}
+
+	s.lastSpeedCheck = time.Now()
+
+	s.logger.Debug("Network speed measurement complete",
+		zap.Float64("speed_kbps", s.networkSpeed),
+		zap.Int64("bytes_downloaded", totalBytes),
+		zap.Float64("duration_seconds", duration),
+	)
+
+	return s.networkSpeed
+}
+
+// GetNetworkStatus returns current network connectivity and speed information
+func (s *Service) GetNetworkStatus() (bool, float64, []Peer) {
+	peers, err := s.GetPeers()
+	if err != nil {
+		s.logger.Warn("Failed to get peers for network status", zap.Error(err))
+		peers = []Peer{}
+	}
+
+	return s.internetConnected, s.networkSpeed, peers
+}
+
+// UpdateNetworkStatus performs connectivity and speed checks if they haven't been done recently
+func (s *Service) UpdateNetworkStatus() {
+	checkInterval := 30 * time.Second
+	speedCheckInterval := 60 * time.Second
+
+	if time.Since(s.lastInternetCheck) > checkInterval {
+		go s.CheckInternetConnectivity()
+	}
+
+	if time.Since(s.lastSpeedCheck) > speedCheckInterval {
+		go s.MeasureNetworkSpeed()
+	}
 }
