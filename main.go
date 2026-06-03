@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/yourusername/so_cl/config"
@@ -98,20 +100,30 @@ func main() {
 }
 
 // initLogger initializes zap logger based on debug flag.
+// Logs to a file to avoid interfering with the TUI.
 func initLogger(debug bool) *zap.Logger {
-	var zapConfig zap.Config
-	if debug {
-		zapConfig = zap.NewDevelopmentConfig()
-	} else {
-		zapConfig = zap.NewProductionConfig()
-	}
+	home, _ := os.UserHomeDir()
+	logDir := filepath.Join(home, ".so_cl")
+	os.MkdirAll(logDir, 0o755)
+	logPath := filepath.Join(logDir, "so_cl.log")
 
-	logger, err := zapConfig.Build()
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to initialize logger: %v", err))
+		panic(fmt.Sprintf("Failed to open log file: %v", err))
 	}
 
-	return logger
+	var encoder zapcore.Encoder
+	var level zapcore.Level
+	if debug {
+		encoder = zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
+		level = zapcore.DebugLevel
+	} else {
+		encoder = zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+		level = zapcore.InfoLevel
+	}
+
+	core := zapcore.NewCore(encoder, zapcore.AddSync(logFile), level)
+	return zap.New(core)
 }
 
 // handleShutdownSignals handles SIGINT and SIGTERM for graceful shutdown.

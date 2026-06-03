@@ -20,6 +20,10 @@ type Post struct {
 	Tags []string
 	// Mentions is the list of @mentions extracted from the post
 	Mentions []string
+	// PFP is the ASCII profile picture (generated from author feed ref)
+	PFP string
+	// LikeCount is the number of likes (votes) on this post
+	LikeCount int
 }
 
 // NewPost creates a new Post struct with the given parameters.

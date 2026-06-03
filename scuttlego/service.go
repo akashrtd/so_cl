@@ -602,6 +602,33 @@ type Peer struct {
 	State   string
 }
 
+// ScuttlegoService defines the contract for SSB operations used by the UI.
+type ScuttlegoService interface {
+	Publish(text string) (string, error)
+	Reply(text, root, branch string) (string, error)
+	React(postRef, expression string) (string, error)
+	GetRecentMessages(limit int) ([]Message, error)
+	Follow(feedRef string) error
+	Unfollow(feedRef string) error
+	GetIdentity() string
+	Connect(address string) error
+	RedeemInvite(inviteCode string) error
+	GetPeers() ([]Peer, error)
+	GetEBTStatus() (bool, int, int)
+	GetTopHashtags(n int) ([]core.TrendingHashtag, error)
+	GetMentions(feedRef string) ([]string, error)
+	GetFollowing(feedRef string) ([]string, error)
+	GetFollowers(feedRef string) ([]string, error)
+	IsFollowing(follower, following string) (bool, error)
+	GetFollowingCount(feedRef string) (int, error)
+	GetFollowersCount(feedRef string) (int, error)
+	SearchPosts(query string) ([]string, error)
+	FilterByHashtag(hashtag string) ([]string, error)
+	FilterByAuthor(author string) ([]string, error)
+	GetNetworkStatus() (bool, float64, []Peer)
+	UpdateNetworkStatus()
+}
+
 // GetEBTStatus returns EBT replication status.
 // EBT is automatic in scuttlego, this provides monitoring.
 func (s *Service) GetEBTStatus() (bool, int, int) {

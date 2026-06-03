@@ -180,9 +180,9 @@ func TestModelUpdate_FeedLoaded(t *testing.T) {
 	svc := &mockScuttlegoService{}
 	model := NewSoClModel(svc)
 
-	posts := []Post{
-		{Author: "alice", Text: "test post", Time: 0},
-		{Author: "bob", Text: "another post", Time: 1},
+	posts := []core.Post{
+		{Author: "alice", Text: "test post", Timestamp: 0},
+		{Author: "bob", Text: "another post", Timestamp: 1},
 	}
 
 	msg := FeedLoadedMsg{Posts: posts}
@@ -302,10 +302,10 @@ func TestModelUpdate_KeyMsg_Enter_AlreadyPublishing(t *testing.T) {
 func TestModelUpdate_KeyMsg_Up(t *testing.T) {
 	svc := &mockScuttlegoService{}
 	model := NewSoClModel(svc)
-	model.posts = []Post{
-		{Author: "a", Text: "post1", Time: 0},
-		{Author: "b", Text: "post2", Time: 1},
-		{Author: "c", Text: "post3", Time: 2},
+	model.posts = []core.Post{
+		{Author: "a", Text: "post1", Timestamp: 0},
+		{Author: "b", Text: "post2", Timestamp: 1},
+		{Author: "c", Text: "post3", Timestamp: 2},
 	}
 	model.cursor = 1
 
@@ -323,10 +323,10 @@ func TestModelUpdate_KeyMsg_Up(t *testing.T) {
 func TestModelUpdate_KeyMsg_Down(t *testing.T) {
 	svc := &mockScuttlegoService{}
 	model := NewSoClModel(svc)
-	model.posts = []Post{
-		{Author: "a", Text: "post1", Time: 0},
-		{Author: "b", Text: "post2", Time: 1},
-		{Author: "c", Text: "post3", Time: 2},
+	model.posts = []core.Post{
+		{Author: "a", Text: "post1", Timestamp: 0},
+		{Author: "b", Text: "post2", Timestamp: 1},
+		{Author: "c", Text: "post3", Timestamp: 2},
 	}
 	model.cursor = 0
 	// Set navCursor to max so KeyDown moves the cursor, not navCursor
@@ -346,7 +346,7 @@ func TestModelUpdate_KeyMsg_Down(t *testing.T) {
 func TestModelUpdate_KeyMsg_Down_AtBottom(t *testing.T) {
 	svc := &mockScuttlegoService{}
 	model := NewSoClModel(svc)
-	model.posts = []Post{{Author: "a", Text: "post", Time: 0}}
+	model.posts = []core.Post{{Author: "a", Text: "post", Timestamp: 0}}
 	model.cursor = 0
 
 	msg := tea.KeyMsg{
@@ -477,9 +477,9 @@ func TestModelView_Feed(t *testing.T) {
 	// Initialize viewport with WindowSizeMsg
 	_, _ = model.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	model.posts = []Post{
-		{Author: "@alice", Text: "hello world", Time: 0},
-		{Author: "@bob", Text: "test post", Time: 1},
+	model.posts = []core.Post{
+		{Author: "@alice", Text: "hello world", Timestamp: 0},
+		{Author: "@bob", Text: "test post", Timestamp: 1},
 	}
 	model.cursor = 1
 
@@ -501,7 +501,7 @@ func TestModelView_EmptyFeed(t *testing.T) {
 	model := NewSoClModel(svc)
 	model.width = 80
 	model.height = 24
-	model.posts = []Post{}
+	model.posts = []core.Post{}
 
 	view := model.View()
 
